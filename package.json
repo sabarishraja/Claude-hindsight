@@ -1,0 +1,30 @@
+{
+  "name": "claude-dost",
+  "version": "0.1.0",
+  "description": "Local dashboard for Claude Code: project briefings and CLAUDE.md instruction audits from your own transcripts",
+  "type": "module",
+  "bin": {
+    "claude-dost": "dist/cli.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && npm run build --prefix ui",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "express": "^5.2.1",
+    "open": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.1.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  }
+}
