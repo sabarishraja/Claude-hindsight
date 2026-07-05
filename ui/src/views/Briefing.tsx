@@ -18,6 +18,7 @@ export default function Briefing({ projects, selected, onSelect }: {
 }) {
   const [briefing, setBriefing] = useState<BriefingData | null>(null);
   const [polishing, setPolishing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!selected) return;
@@ -26,14 +27,14 @@ export default function Briefing({ projects, selected, onSelect }: {
       .then((b) => { if (live) setBriefing(b); })
       .catch(() => { if (live) setBriefing(null); });
     return () => { live = false; };
-  }, [selected]);
+  }, [selected, refreshKey]);
 
   const polish = async () => {
     if (!selected) return;
     setPolishing(true);
     try {
       await runPolish(selected);
-      fetchBriefing(selected).then(setBriefing).catch(() => setBriefing(null));
+      setRefreshKey((k) => k + 1);
     } finally { setPolishing(false); }
   };
 
