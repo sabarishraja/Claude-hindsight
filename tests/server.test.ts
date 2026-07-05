@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Server } from 'node:http';
@@ -67,5 +67,27 @@ describe('API', () => {
     expect(res.status).toBe(200);
     const briefing = await res.json() as { cards: unknown[] };
     expect(briefing.cards).toEqual([]);
+  });
+
+  it('GET /api/audit returns JSON 500 when CLAUDE.md is a directory', async () => {
+    const badClaudeDir = mkdtempSync(join(tmpdir(), 'dost-bad-claude-'));
+    mkdirSync(join(badClaudeDir, 'CLAUDE.md'));
+    const badStore = new Store(':memory:');
+    badStore.upsertSession(session({}));
+    const badApp = createServer(badStore, { uiDist: null, claudeDir: badClaudeDir });
+    let badServer: Server;
+    await new Promise<void>((resolve) => { badServer = badApp.listen(0, resolve); });
+    const badAddr = badServer.address();
+    const badBase = `http://127.0.0.1:${typeof badAddr === 'object' && badAddr ? badAddr.port : 0}`;
+
+    const res = await fetch(`${badBase}/api/audit`);
+    expect(res.status).toBe(500);
+    const body = await res.json() as { error: string };
+    expect(body).toHaveProperty('error');
+    expect(typeof body.error).toBe('string');
+
+    badServer.close();
+    badStore.close();
+    rmSync(badClaudeDir, { recursive: true, force: true });
   });
 });

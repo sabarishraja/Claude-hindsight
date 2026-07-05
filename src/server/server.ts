@@ -16,29 +16,41 @@ export function createServer(store: Store, options: ServerOptions): express.Expr
   app.use(express.json());
 
   app.get('/api/projects', (_req, res) => {
-    res.json(store.listProjects());
+    try {
+      res.json(store.listProjects());
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
   });
 
   app.get('/api/projects/:dir/briefing', (req, res) => {
-    const sessions = store.getSessions(req.params.dir);
-    const polish = new Map<string, PolishResult>();
-    for (const s of sessions) {
-      const p = store.getPolish(s.sessionId);
-      if (p) polish.set(s.sessionId, p);
+    try {
+      const sessions = store.getSessions(req.params.dir);
+      const polish = new Map<string, PolishResult>();
+      for (const s of sessions) {
+        const p = store.getPolish(s.sessionId);
+        if (p) polish.set(s.sessionId, p);
+      }
+      res.json(buildBriefing(req.params.dir, sessions, polish));
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
     }
-    res.json(buildBriefing(req.params.dir, sessions, polish));
   });
 
   app.get('/api/audit', (_req, res) => {
-    const projects = store.listProjects();
-    const files = discoverClaudeMds(options.claudeDir, projects);
-    const reports = files.map((f) => {
-      const sessions = f.projectDir === null
-        ? store.getAllSessions()
-        : store.getSessions(f.projectDir);
-      return auditInstructions(parseInstructions(f.markdown, f.source), sessions);
-    });
-    res.json(reports);
+    try {
+      const projects = store.listProjects();
+      const files = discoverClaudeMds(options.claudeDir, projects);
+      const reports = files.map((f) => {
+        const sessions = f.projectDir === null
+          ? store.getAllSessions()
+          : store.getSessions(f.projectDir);
+        return auditInstructions(parseInstructions(f.markdown, f.source), sessions);
+      });
+      res.json(reports);
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
   });
 
   if (options.uiDist) {
