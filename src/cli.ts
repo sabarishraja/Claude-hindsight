@@ -40,7 +40,7 @@ async function main(): Promise<void> {
   const uiDist = join(here, '..', 'ui', 'dist');
   const app = createServer(store, { uiDist: existsSync(uiDist) ? uiDist : null, claudeDir });
 
-  app.listen(port, async () => {
+  app.listen(port, '127.0.0.1', async () => {
     const url = `http://localhost:${port}`;
     console.log(`claude-dost running at ${url}`);
     if (!noOpen) {
