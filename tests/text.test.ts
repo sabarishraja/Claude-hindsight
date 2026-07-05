@@ -1,0 +1,41 @@
+import { describe, it, expect } from 'vitest';
+import { stripInjectedNoise, extractMessageText } from '../src/analyzer/text.js';
+
+describe('stripInjectedNoise', () => {
+  it('removes system-reminder blocks', () => {
+    expect(stripInjectedNoise('hello <system-reminder>noise\nmore</system-reminder> world'))
+      .toBe('hello  world');
+  });
+  it('removes command wrappers', () => {
+    const input = '<command-name>/foo</command-name><command-args>bar</command-args>real text';
+    expect(stripInjectedNoise(input)).toBe('real text');
+  });
+});
+
+describe('extractMessageText', () => {
+  it('extracts string content', () => {
+    const rec = { type: 'user', message: { role: 'user', content: 'fix the login bug' } };
+    expect(extractMessageText(rec)).toBe('fix the login bug');
+  });
+  it('extracts and joins text blocks from array content', () => {
+    const rec = { type: 'assistant', message: { role: 'assistant', content: [
+      { type: 'text', text: 'part one' },
+      { type: 'tool_use', id: 't1', name: 'Bash', input: {} },
+      { type: 'text', text: 'part two' },
+    ] } };
+    expect(extractMessageText(rec)).toBe('part one\npart two');
+  });
+  it('returns null when only noise remains', () => {
+    const rec = { type: 'user', message: { role: 'user', content: '<system-reminder>x</system-reminder>' } };
+    expect(extractMessageText(rec)).toBe(null);
+  });
+  it('returns null for tool_result-only user records', () => {
+    const rec = { type: 'user', toolUseResult: { ok: true }, message: { role: 'user', content: [
+      { type: 'tool_result', tool_use_id: 't1', content: 'output' },
+    ] } };
+    expect(extractMessageText(rec)).toBe(null);
+  });
+  it('returns null for records without a message', () => {
+    expect(extractMessageText({ type: 'queue-operation' })).toBe(null);
+  });
+});
