@@ -9,9 +9,10 @@ database, and serves a two-view web dashboard for browsing what you've actually 
 **Project Briefing** — a per-project timeline of sessions: extracted goal (from your first
 message), files edited, commands run, tokens used, duration, and an ending badge
 (`clean` / `error` / `abandoned`). The top of the page shows a "where you left off" header
-built from the most recent session. Each card has an optional **✨ Polish** button that
-shells out to your locally-installed `claude` CLI to rewrite the goal/outcome into a cleaner
-one-sentence summary; the result is cached in SQLite so you only pay for it once per session.
+built from the most recent session, with a single per-project **✨ Polish** button that
+shells out to your locally-installed `claude` CLI to rewrite the goal/outcome of unpolished
+sessions into cleaner one-sentence summaries; results are cached in SQLite so you only pay
+for it once per session.
 
 **Instruction Audit** — parses your global `~/.claude/CLAUDE.md` and any per-project
 `CLAUDE.md` files into discrete rules (one per bullet/paragraph), then cross-examines each
@@ -61,9 +62,9 @@ claude-dost is 100% local:
 - It **writes only** to `~/.claude-dost/index.db` (a local SQLite file).
 - It makes **no network calls** and has **no telemetry** — nothing is sent anywhere.
 - The only process it ever spawns is your already-installed `claude` CLI, and only when you
-  explicitly click **Polish** on a session card. If `claude` isn't on your `PATH`, or the
-  call fails or times out, Polish silently falls back to the unpolished summary — nothing
-  crashes, nothing is sent over the network.
+  explicitly click the per-project **Polish** button in the briefing header. If `claude`
+  isn't on your `PATH`, or the call fails or times out, Polish silently falls back to the
+  unpolished summary — nothing crashes, nothing is sent over the network.
 
 ## How the audit works, honestly
 
@@ -80,10 +81,11 @@ matching. Concretely, per rule:
   A rule needs a strong token with **zero** matches anywhere in the corpus to be called `dead`.
 - Negation patterns (`never X`, `don't X`, `avoid X`, `use A over B`, `A is banned`) extract a
   "negative" target; if that target shows up in a session's actual commands, the rule is
-  `violated`.
-- Matching uses word-boundary regexes (`(?<![\w@/.-])token(?![\w@/.-])`) against commands run,
-  files edited, and skills invoked — not against arbitrary prose in the transcript, and not
-  against assistant reasoning.
+  `violated`. The `violated` check only scans **commands run** — it does not look at files
+  edited or skills invoked.
+- Matching uses word-boundary regexes (`(?<![\w@/.-])token(?![\w@/.-])`). The `followed` and
+  `dead` verdicts scan a broader corpus — commands run, files edited, and skills invoked —
+  but never arbitrary prose in the transcript or assistant reasoning.
 
 **Limitations, spelled out:**
 
