@@ -30,6 +30,12 @@ describe('polishSession', () => {
     expect(await polishSession(facts, async () => { throw new Error('claude not found'); })).toBe(null);
   });
 
+  it('parses JSON whose string values contain braces (greedy extraction)', async () => {
+    const result = await polishSession(facts, async () =>
+      '{"goal": "fix {config} parsing", "outcome": "done"}');
+    expect(result).toEqual({ goal: 'fix {config} parsing', outcome: 'done' });
+  });
+
   it('includes session facts in the prompt', async () => {
     let seen = '';
     await polishSession(facts, async (prompt) => { seen = prompt; return '{}'; });

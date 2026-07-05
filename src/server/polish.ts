@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { exec } from 'node:child_process';
 import type { SessionFacts, PolishResult } from '../types.js';
 
 export type ClaudeRunner = (prompt: string) => Promise<string>;
@@ -19,7 +19,7 @@ function buildPrompt(f: SessionFacts): string {
 export async function polishSession(facts: SessionFacts, runClaude: ClaudeRunner): Promise<PolishResult | null> {
   try {
     const output = await runClaude(buildPrompt(facts));
-    const match = output.match(/\{[\s\S]*?\}/);
+    const match = output.match(/\{[\s\S]*\}/);
     if (!match) return null;
     const parsed = JSON.parse(match[0]) as { goal?: unknown; outcome?: unknown };
     if (typeof parsed.goal === 'string' && typeof parsed.outcome === 'string') {
@@ -33,8 +33,8 @@ export async function polishSession(facts: SessionFacts, runClaude: ClaudeRunner
 
 export const defaultRunClaude: ClaudeRunner = (prompt) =>
   new Promise((resolve, reject) => {
-    execFile('claude', ['-p', prompt, '--output-format', 'text'], {
-      timeout: 60_000, shell: process.platform === 'win32', windowsHide: true,
-      maxBuffer: 1024 * 1024,
-    }, (err, stdout) => (err ? reject(err) : resolve(stdout)));
+    const child = exec('claude -p --output-format text',
+      { timeout: 60_000, windowsHide: true, maxBuffer: 1024 * 1024 },
+      (err, stdout) => (err ? reject(err) : resolve(stdout)));
+    child.stdin!.end(prompt);
   });
