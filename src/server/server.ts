@@ -5,10 +5,12 @@ import { buildBriefing } from '../analyzer/briefing.js';
 import { parseInstructions } from '../analyzer/instructions.js';
 import { auditInstructions } from '../analyzer/audit.js';
 import { discoverClaudeMds } from './configFiles.js';
+import { polishSession, defaultRunClaude, type ClaudeRunner } from './polish.js';
 
 export interface ServerOptions {
   uiDist: string | null;
   claudeDir: string;
+  claudeRunner?: ClaudeRunner;
 }
 
 export function createServer(store: Store, options: ServerOptions): express.Express {
@@ -48,6 +50,24 @@ export function createServer(store: Store, options: ServerOptions): express.Expr
         return auditInstructions(parseInstructions(f.markdown, f.source), sessions);
       });
       res.json(reports);
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  app.post('/api/projects/:dir/polish', async (req, res) => {
+    try {
+      const runner = options.claudeRunner ?? defaultRunClaude;
+      const sessions = store.getSessions(req.params.dir).filter((s) => s.goal !== null);
+      let polished = 0;
+      let failed = 0;
+      for (const s of sessions) {
+        if (store.getPolish(s.sessionId)) continue;
+        const result = await polishSession(s, runner);
+        if (result) { store.setPolish(s.sessionId, result); polished++; }
+        else failed++;
+      }
+      res.json({ polished, failed });
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
     }
