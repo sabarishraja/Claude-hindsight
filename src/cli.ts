@@ -15,6 +15,10 @@ function arg(name: string, fallback: string): string {
 async function main(): Promise<void> {
   const claudeDir = arg('claude-dir', join(homedir(), '.claude'));
   const port = Number(arg('port', '4756'));
+  if (!Number.isInteger(port) || port <= 0 || port >= 65536) {
+    console.error(`Invalid --port value: ${arg('port', '4756')}. Must be an integer between 1 and 65535.`);
+    process.exit(1);
+  }
   const noOpen = process.argv.includes('--no-open');
 
   const dataDir = join(homedir(), '.claude-dost');
@@ -40,13 +44,27 @@ async function main(): Promise<void> {
   const uiDist = join(here, '..', 'ui', 'dist');
   const app = createServer(store, { uiDist: existsSync(uiDist) ? uiDist : null, claudeDir });
 
-  app.listen(port, '127.0.0.1', async () => {
+  const server = app.listen(port, '127.0.0.1', async () => {
     const url = `http://localhost:${port}`;
     console.log(`claude-dost running at ${url}`);
     if (!noOpen) {
       const { default: open } = await import('open');
       await open(url).catch(() => { /* browser open is best-effort */ });
     }
+  });
+
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${port} is already in use. Try a different --port.`);
+    } else {
+      console.error(`Server error: ${err.message}`);
+    }
+    process.exit(1);
+  });
+
+  process.on('SIGINT', () => {
+    store.close();
+    process.exit(0);
   });
 }
 
