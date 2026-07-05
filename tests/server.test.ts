@@ -90,4 +90,68 @@ describe('API', () => {
     badStore.close();
     rmSync(badClaudeDir, { recursive: true, force: true });
   });
+
+  it('POST polish caps at 10 sessions per request and reports remaining', async () => {
+    const capClaudeDir = mkdtempSync(join(tmpdir(), 'dost-cap-claude-'));
+    const capStore = new Store(':memory:');
+    for (let i = 0; i < 12; i++) {
+      capStore.upsertSession(session({
+        sessionId: `cap-${i}`,
+        projectDir: 'proj-cap',
+        goal: `do the thing number ${i} for this session`,
+        lastTs: `2026-07-01T10:${String(i).padStart(2, '0')}:00Z`,
+      }));
+    }
+    const capApp = createServer(capStore, {
+      uiDist: null, claudeDir: capClaudeDir,
+      claudeRunner: async () => '{"goal": "g", "outcome": "o"}',
+    });
+    let capServer: Server;
+    await new Promise<void>((resolve) => { capServer = capApp.listen(0, resolve); });
+    const capAddr = capServer!.address();
+    const capBase = `http://127.0.0.1:${typeof capAddr === 'object' && capAddr ? capAddr.port : 0}`;
+
+    const res = await fetch(`${capBase}/api/projects/proj-cap/polish`, { method: 'POST' });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { polished: number; failed: number; remaining: number };
+    expect(body.polished).toBe(10);
+    expect(body.remaining).toBe(2);
+
+    capServer!.close();
+    capStore.close();
+    rmSync(capClaudeDir, { recursive: true, force: true });
+  });
+
+  it('POST polish returns 409 when already in-flight for the same project', async () => {
+    const cClaudeDir = mkdtempSync(join(tmpdir(), 'dost-conc-claude-'));
+    const cStore = new Store(':memory:');
+    cStore.upsertSession(session({ sessionId: 'conc-1', projectDir: 'proj-conc', goal: 'work on the concurrent test session' }));
+
+    let releaseFirst: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    const cApp = createServer(cStore, {
+      uiDist: null, claudeDir: cClaudeDir,
+      claudeRunner: async () => { await gate; return '{"goal": "g", "outcome": "o"}'; },
+    });
+    let cServer: Server;
+    await new Promise<void>((resolve) => { cServer = cApp.listen(0, resolve); });
+    const cAddr = cServer!.address();
+    const cBase = `http://127.0.0.1:${typeof cAddr === 'object' && cAddr ? cAddr.port : 0}`;
+
+    const firstReq = fetch(`${cBase}/api/projects/proj-conc/polish`, { method: 'POST' });
+    // give the first request a tick to register itself as in-flight
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const secondRes = await fetch(`${cBase}/api/projects/proj-conc/polish`, { method: 'POST' });
+    expect(secondRes.status).toBe(409);
+    const secondBody = await secondRes.json() as { error: string };
+    expect(secondBody.error).toBe('polish already running for this project');
+
+    releaseFirst();
+    const firstRes = await firstReq;
+    expect(firstRes.status).toBe(200);
+
+    cServer!.close();
+    cStore.close();
+    rmSync(cClaudeDir, { recursive: true, force: true });
+  });
 });

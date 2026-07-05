@@ -13,6 +13,9 @@ export interface ServerOptions {
   claudeRunner?: ClaudeRunner;
 }
 
+const POLISH_BATCH_SIZE = 10;
+const inFlightPolish = new Set<string>();
+
 export function createServer(store: Store, options: ServerOptions): express.Express {
   const app = express();
   app.use(express.json());
@@ -56,20 +59,31 @@ export function createServer(store: Store, options: ServerOptions): express.Expr
   });
 
   app.post('/api/projects/:dir/polish', async (req, res) => {
+    const dir = req.params.dir;
+    if (inFlightPolish.has(dir)) {
+      res.status(409).json({ error: 'polish already running for this project' });
+      return;
+    }
+    inFlightPolish.add(dir);
     try {
       const runner = options.claudeRunner ?? defaultRunClaude;
-      const sessions = store.getSessions(req.params.dir).filter((s) => s.goal !== null);
+      // getSessions returns sessions sorted lastTs DESC, so this is already newest-first.
+      const unpolished = store.getSessions(dir)
+        .filter((s) => s.goal !== null && !store.getPolish(s.sessionId));
+      const batch = unpolished.slice(0, POLISH_BATCH_SIZE);
       let polished = 0;
       let failed = 0;
-      for (const s of sessions) {
-        if (store.getPolish(s.sessionId)) continue;
+      for (const s of batch) {
         const result = await polishSession(s, runner);
         if (result) { store.setPolish(s.sessionId, result); polished++; }
         else failed++;
       }
-      res.json({ polished, failed });
+      const remaining = unpolished.length - batch.length;
+      res.json({ polished, failed, remaining });
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      inFlightPolish.delete(dir);
     }
   });
 

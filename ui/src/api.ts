@@ -28,4 +28,4 @@ export const fetchBriefing = (dir: string) =>
 export const fetchAudit = () => fetch('/api/audit').then((r) => json<AuditReport[]>(r));
 export const runPolish = (dir: string) =>
   fetch(`/api/projects/${encodeURIComponent(dir)}/polish`, { method: 'POST' })
-    .then((r) => json<{ polished: number; failed: number }>(r));
+    .then((r) => json<{ polished: number; failed: number; remaining: number }>(r));
