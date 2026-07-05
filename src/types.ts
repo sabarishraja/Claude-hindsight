@@ -7,7 +7,7 @@ export interface SessionFacts {
   goal: string | null;       // null => noise session (hidden in UI)
   firstTs: string | null;    // ISO timestamps
   lastTs: string | null;
-  messageCount: number;      // user + assistant records, sidechains excluded
+  messageCount: number;      // text-bearing user + assistant messages; sidechains and tool_result-only records excluded
   inputTokens: number;
   outputTokens: number;
   filesEdited: string[];     // from Edit/Write/NotebookEdit tool_use inputs
