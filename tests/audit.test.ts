@@ -64,4 +64,36 @@ describe('auditInstructions', () => {
     expect(f.estTotalTokens).toBe(f.estTokens * 2);
     expect(f.sessionsChecked).toBe(2);
   });
+
+  it('flags violated for "use A over B" negation pattern', () => {
+    const report = auditInstructions(
+      [inst('Use `pnpm` over `npm`')],
+      [session({ sessionId: 'sX', commandsRun: ['npm install'] })],
+    );
+    expect(report.findings[0].verdict).toBe('violated');
+  });
+
+  it('flags followed for bare single-word tool name in prose (weak token match)', () => {
+    const report = auditInstructions(
+      [inst('Always run vitest before committing')],
+      [session({ commandsRun: ['vitest run'] })],
+    );
+    expect(report.findings[0].verdict).toBe('followed');
+  });
+
+  it('flags unchecked (not dead) for bare single-word tool name with no corpus match', () => {
+    const report = auditInstructions(
+      [inst('Always run vitest before committing')],
+      [session({ commandsRun: ['git status'] })],
+    );
+    expect(report.findings[0].verdict).toBe('unchecked');
+  });
+
+  it('still flags dead for backticked rule with unrelated corpus', () => {
+    const report = auditInstructions(
+      [inst('Use `django-admin` for migrations')],
+      [session({ commandsRun: ['npm test', 'git status'] })],
+    );
+    expect(report.findings[0].verdict).toBe('dead');
+  });
 });
