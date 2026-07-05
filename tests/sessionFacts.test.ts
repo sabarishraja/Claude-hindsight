@@ -74,6 +74,16 @@ describe('extractSessionFacts', () => {
     expect(facts.ending).toBe('abandoned');
   });
 
+  it('does not count assistant records that are tool_use-only (no text) toward messageCount', () => {
+    const facts = extractSessionFacts([
+      user('please refactor the widget module for me thanks'),
+      assistant([
+        { type: 'tool_use', id: 't1', name: 'Bash', input: { command: 'npm test' } },
+      ]),
+    ], 's1', 'proj', 0);
+    expect(facts.messageCount).toBe(1);
+  });
+
   it('sums tokens and computes timestamps', () => {
     const facts = extractSessionFacts([
       user('add a dark mode toggle to the settings page'),

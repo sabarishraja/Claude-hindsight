@@ -62,9 +62,11 @@ export function extractSessionFacts(
         }
       }
       if (!sidechain) {
-        messageCount++;
         const text = extractMessageText(rec);
-        if (text) lastAssistantText = text;
+        if (text) {
+          messageCount++;
+          lastAssistantText = text;
+        }
       }
     } else if (type === 'user') {
       if (hasErrorResult(rec)) errorCount++;
