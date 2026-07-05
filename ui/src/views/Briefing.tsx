@@ -19,13 +19,22 @@ export default function Briefing({ projects, selected, onSelect }: {
   const [briefing, setBriefing] = useState<BriefingData | null>(null);
   const [polishing, setPolishing] = useState(false);
 
-  const load = (dir: string) => fetchBriefing(dir).then(setBriefing).catch(() => setBriefing(null));
-  useEffect(() => { if (selected) void load(selected); }, [selected]);
+  useEffect(() => {
+    if (!selected) return;
+    let live = true;
+    fetchBriefing(selected)
+      .then((b) => { if (live) setBriefing(b); })
+      .catch(() => { if (live) setBriefing(null); });
+    return () => { live = false; };
+  }, [selected]);
 
   const polish = async () => {
     if (!selected) return;
     setPolishing(true);
-    try { await runPolish(selected); await load(selected); } finally { setPolishing(false); }
+    try {
+      await runPolish(selected);
+      fetchBriefing(selected).then(setBriefing).catch(() => setBriefing(null));
+    } finally { setPolishing(false); }
   };
 
   return (
