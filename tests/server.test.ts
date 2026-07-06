@@ -6,6 +6,7 @@ import type { Server } from 'node:http';
 import { Store } from '../src/indexer/store.js';
 import { createServer } from '../src/server/server.js';
 import type { SessionFacts } from '../src/types.js';
+import { refreshArchitecture } from '../src/architecture/architecture.js';
 
 const session = (over: Partial<SessionFacts>): SessionFacts => ({
   sessionId: 's1', projectDir: 'proj-a', cwd: null, goal: 'ship the briefing view for the dashboard',
@@ -67,6 +68,41 @@ describe('API', () => {
     expect(res.status).toBe(200);
     const briefing = await res.json() as { cards: unknown[] };
     expect(briefing.cards).toEqual([]);
+  });
+
+  it('GET /api/projects/:dir/architecture returns nulls when dataDir is not configured', async () => {
+    const res = await fetch(`${base}/api/projects/proj-a/architecture`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { markdown: string | null; meta: unknown; staleBy: number };
+    expect(body).toEqual({ markdown: null, meta: null, staleBy: 0 });
+  });
+
+  it('GET /api/projects/:dir/architecture returns the generated doc and staleness', async () => {
+    const archClaudeDir = mkdtempSync(join(tmpdir(), 'dost-arch-claude-'));
+    const archDataDir = mkdtempSync(join(tmpdir(), 'dost-arch-data-'));
+    const archStore = new Store(':memory:');
+    archStore.upsertSession(session({ sessionId: 'arch-1', projectDir: 'proj-arch' }));
+    await refreshArchitecture(archStore, 'proj-arch', {
+      dataDir: archDataDir,
+      runner: async () =>
+        '## What this app does\nx\n## The main parts\nx\n' +
+        '## How the pieces work together\nx\n## Recent changes\n- did a thing',
+    });
+    const archApp = createServer(archStore, { uiDist: null, claudeDir: archClaudeDir, dataDir: archDataDir });
+    let archServer: Server;
+    await new Promise<void>((resolve) => { archServer = archApp.listen(0, resolve); });
+    const archAddr = archServer!.address();
+    const archBase = `http://127.0.0.1:${typeof archAddr === 'object' && archAddr ? archAddr.port : 0}`;
+
+    const res = await fetch(`${archBase}/api/projects/proj-arch/architecture`);
+    const body = await res.json() as { markdown: string; staleBy: number };
+    expect(body.markdown).toContain('What this app does');
+    expect(body.staleBy).toBe(0);
+
+    archServer!.close();
+    archStore.close();
+    rmSync(archClaudeDir, { recursive: true, force: true });
+    rmSync(archDataDir, { recursive: true, force: true });
   });
 
   it('GET /api/audit returns JSON 500 when CLAUDE.md is a directory', async () => {

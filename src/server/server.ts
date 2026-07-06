@@ -6,11 +6,13 @@ import { parseInstructions } from '../analyzer/instructions.js';
 import { auditInstructions } from '../analyzer/audit.js';
 import { discoverClaudeMds } from './configFiles.js';
 import { polishSession, defaultRunClaude, type ClaudeRunner } from './polish.js';
+import { getArchitectureView } from '../architecture/architecture.js';
 
 export interface ServerOptions {
   uiDist: string | null;
   claudeDir: string;
   claudeRunner?: ClaudeRunner;
+  dataDir?: string;
 }
 
 const POLISH_BATCH_SIZE = 10;
@@ -37,6 +39,18 @@ export function createServer(store: Store, options: ServerOptions): express.Expr
         if (p) polish.set(s.sessionId, p);
       }
       res.json(buildBriefing(req.params.dir, sessions, polish));
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  app.get('/api/projects/:dir/architecture', (req, res) => {
+    try {
+      if (!options.dataDir) {
+        res.json({ markdown: null, meta: null, staleBy: 0 });
+        return;
+      }
+      res.json(getArchitectureView(store, req.params.dir, options.dataDir));
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
     }
