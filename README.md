@@ -117,6 +117,21 @@ None of these ever run the indexer or spend tokens except `refresh_architecture`
 them ever throw — an unindexed project or missing doc just returns a calm, informative result.
 See "Claude Code plugin" below for the easiest way to wire this in.
 
+### Install as a Claude Code plugin (recommended)
+
+The easiest way to get hindsight's MCP tools and session-start briefing working in a project,
+with no clone and no build step:
+
+```
+/plugin marketplace add sabarishraja/Claude-hindsight
+/plugin install claude-hindsight
+```
+
+This wires up both the MCP server (`npx claude-hindsight@latest mcp`, launched automatically)
+and the `SessionStart` hook. Toggle it on or off per project the same way as any other Claude
+Code plugin. Requires publishing this package to npm first (`npm publish`) so `npx` can resolve
+it without a local clone.
+
 ### Show your briefing to Claude at session start
 
 The panel in Claude Code's own welcome screen isn't extensible, but you can do one better:

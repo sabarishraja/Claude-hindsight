@@ -1,0 +1,12 @@
+{
+  "name": "claude-hindsight",
+  "description": "Hindsight for your Claude Code history — live briefing, architecture, and CLAUDE.md audit tools via MCP, plus a SessionStart context hook. 100% local, no telemetry.",
+  "version": "0.2.0",
+  "author": {
+    "name": "R.SABARISH RAJA"
+  },
+  "repository": "https://github.com/sabarishraja/Claude-hindsight",
+  "license": "MIT",
+  "keywords": ["claude-code", "mcp", "productivity", "session-history", "architecture-doc"],
+  "homepage": "https://github.com/sabarishraja/Claude-hindsight"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "claude-hindsight-marketplace",
+  "owner": {
+    "name": "R.SABARISH RAJA"
+  },
+  "plugins": [
+    {
+      "name": "claude-hindsight",
+      "source": "./",
+      "description": "Hindsight for your Claude Code history — live briefing, architecture, and CLAUDE.md audit tools via MCP, plus a SessionStart context hook. 100% local."
+    }
+  ]
+}
