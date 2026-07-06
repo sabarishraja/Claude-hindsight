@@ -4,6 +4,7 @@ import { Store } from '../indexer/store.js';
 import { buildBriefing } from '../analyzer/briefing.js';
 import { updateLiveStats } from './liveSession.js';
 import { renderStatusline, type StatuslineView } from './render.js';
+import { getArchitectureView } from '../architecture/architecture.js';
 import type { PolishResult } from '../types.js';
 
 interface StdinData {
@@ -76,6 +77,8 @@ export function runStatusline(stdinText: string, dataDir: string): string {
         }
         const briefing = buildBriefing(project.projectDir, sessions, polish);
         view.sessionCount = store.getSessions(project.projectDir).length;
+        const archView = getArchitectureView(store, project.projectDir, dataDir, data.session_id);
+        if (archView.markdown !== null) view.archStaleBy = archView.staleBy;
         const latest = briefing.cards[0];
         if (latest) {
           view.last = {

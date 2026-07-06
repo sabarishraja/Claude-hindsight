@@ -56,4 +56,25 @@ describe('renderStatusline', () => {
     expect(row2).not.toContain('$');
     expect(row2).not.toContain('Fable');
   });
+
+  it('appends an arch-staleness segment to row 1 when set and positive', () => {
+    const view: StatuslineView = {
+      ...base,
+      last: { when: '2026-07-06T08:00:00Z', ending: 'clean', goal: 'ship it', pendingQuestion: false },
+      archStaleBy: 3,
+    };
+    const row1 = strip(renderStatusline(view, new Date('2026-07-06T10:00:00Z'))).split('\n')[0];
+    expect(row1).toContain('▲ arch doc 3 sessions behind');
+  });
+
+  it('omits the arch-staleness segment when zero or unset', () => {
+    const view: StatuslineView = {
+      ...base,
+      last: { when: '2026-07-06T08:00:00Z', ending: 'clean', goal: 'ship it', pendingQuestion: false },
+      archStaleBy: 0,
+    };
+    expect(strip(renderStatusline(view)).split('\n')[0]).not.toContain('arch doc');
+    const { archStaleBy: _drop, ...noField } = view;
+    expect(strip(renderStatusline(noField)).split('\n')[0]).not.toContain('arch doc');
+  });
 });

@@ -15,6 +15,7 @@ export interface StatuslineView {
   liveFiles: number;
   liveCommands: number;
   sessionCount: number;
+  archStaleBy?: number;          // undefined/0 => no nudge; >0 => sessions behind
 }
 
 const MAX_WIDTH = 110; // keep rows on one line in typical terminals
@@ -37,6 +38,10 @@ export function renderStatusline(view: StatuslineView, now: Date = new Date()): 
       p(badge.color, `[${badge.text}]`) +
       ' ' + truncate(view.last.goal, room) +
       (tail ? p(ANSI.yellow, tail) : '');
+  }
+
+  if (typeof view.archStaleBy === 'number' && view.archStaleBy > 0) {
+    row1 += p(ANSI.yellow, ` · ▲ arch doc ${view.archStaleBy} session${view.archStaleBy === 1 ? '' : 's'} behind`);
   }
 
   const segments: string[] = [p(ANSI.bold + ANSI.orange, '🕶 Hindsight')];

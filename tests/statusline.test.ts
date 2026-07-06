@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { Store } from '../src/indexer/store.js';
 import { runStatusline, USAGE } from '../src/statusline/statusline.js';
+import { refreshArchitecture } from '../src/architecture/architecture.js';
 import type { SessionFacts } from '../src/types.js';
 
 const strip = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
@@ -128,5 +129,21 @@ describe('runStatusline', () => {
     if (existsSync(statuslineDir)) {
       expect(readdirSync(statuslineDir)).toEqual([]);
     }
+  });
+
+  it('adds the arch-staleness segment when an architecture doc has fallen behind', async () => {
+    const { dataDir, transcript } = setup();
+    const VALID_DOC =
+      '## What this app does\nx\n## The main parts\nx\n' +
+      '## How the pieces work together\nx\n## Recent changes\n- did a thing';
+    const store = new Store(join(dataDir, 'index.db'));
+    await refreshArchitecture(store, 'proj', { dataDir, runner: async () => VALID_DOC });
+    store.upsertSession(facts({
+      sessionId: 'prev2', goal: 'a later prev session', lastTs: '2026-07-06T10:30:00Z',
+    }));
+    store.close();
+
+    const row1 = strip(runStatusline(stdinFor(dataDir, transcript), dataDir)).split('\n')[0];
+    expect(row1).toContain('arch doc 1 session behind');
   });
 });
