@@ -173,8 +173,13 @@ async function architectureCommand(store: Store, dataDir: string): Promise<void>
 
   const writeIdx = process.argv.indexOf('--write');
   if (writeIdx !== -1 && process.argv[writeIdx + 1] && view.markdown) {
-    writeFileSync(process.argv[writeIdx + 1], view.markdown);
-    console.log(`\nExported to ${process.argv[writeIdx + 1]}`);
+    if (result.status === 'error' || result.status === 'rejected') {
+      console.log(`\nSkipped export to ${process.argv[writeIdx + 1]}: this run's refresh did not succeed ` +
+        '(the doc shown above is the last known-good version).');
+    } else {
+      writeFileSync(process.argv[writeIdx + 1], view.markdown);
+      console.log(`\nExported to ${process.argv[writeIdx + 1]}`);
+    }
   }
 }
 

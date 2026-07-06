@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { exec } from 'node:child_process';
 
 export interface SessionSummary {
   goal: string;
@@ -110,10 +110,10 @@ export type ArchRunner = (
 
 export const defaultRunClaude: ArchRunner = (prompt, opts) =>
   new Promise((resolve, reject) => {
-    const args = ['-p', '--output-format', 'text'];
-    if (opts.tools) args.push('--allowedTools', 'Read', 'Glob', 'Grep');
-    const child = execFile(
-      'claude', args,
+    let command = 'claude -p --output-format text';
+    if (opts.tools) command += ' --allowedTools Read Glob Grep';
+    const child = exec(
+      command,
       { cwd: opts.cwd, timeout: opts.timeoutMs, windowsHide: true, maxBuffer: 5 * 1024 * 1024 },
       (err, stdout) => (err ? reject(err) : resolve(stdout)),
     );
