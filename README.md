@@ -58,6 +58,22 @@ Flags:
 - `--no-open` — with `--web`, don't auto-open a browser tab
 - `--claude-dir <path>` — use a Claude directory other than `~/.claude` (mainly for testing)
 
+### Statusline: hindsight inside every Claude Code session
+
+`claude-hindsight statusline` renders a two-row Claude Code statusline: row 1 is
+your previous session's story (ending badge, goal, and a ⚠ marker if it ended on
+an unanswered question); row 2 shows the current model, session cost, live
+files-edited/commands-run counts, and how many sessions are indexed.
+
+```bash
+node dist/cli.js statusline --install            # wire into ~/.claude/settings.json
+node dist/cli.js statusline --install --project  # this project's .claude/settings.json instead
+```
+
+`--install` backs up your existing settings first and refuses to replace a
+different statusLine unless you pass `--force`. It never runs the indexer —
+row 1 updates when you next run `claude-hindsight` (or your SessionStart hook).
+
 ### Show your briefing to Claude at session start
 
 The panel in Claude Code's own welcome screen isn't extensible, but you can do one better:

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { homedir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
-import { mkdirSync, existsSync } from 'node:fs';
+import { mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { Store } from './indexer/store.js';
 import { indexProjects } from './indexer/indexer.js';
@@ -9,6 +9,8 @@ import { createServer } from './server/server.js';
 import { buildBriefing } from './analyzer/briefing.js';
 import { renderBriefing, renderProjectList } from './terminal/render.js';
 import type { PolishResult } from './types.js';
+import { runStatusline } from './statusline/statusline.js';
+import { installStatusline } from './statusline/install.js';
 
 function arg(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`);
@@ -99,7 +101,40 @@ async function serveWeb(store: Store, claudeDir: string): Promise<void> {
   });
 }
 
+// Statusline render mode must never throw, exit nonzero, or print a stack
+// trace: Claude Code re-runs it on every assistant message and renders
+// whatever lands on stdout.
+function statuslineCommand(): void {
+  const dataDir = join(homedir(), '.claude-hindsight');
+
+  if (process.argv.includes('--install')) {
+    const settingsPath = process.argv.includes('--project')
+      ? join(process.cwd(), '.claude', 'settings.json')
+      : join(homedir(), '.claude', 'settings.json');
+    const cliPath = fileURLToPath(import.meta.url);
+    const result = installStatusline(settingsPath, `node "${cliPath}" statusline`, process.argv.includes('--force'));
+    console.log(result.message);
+    if (result.action === 'refused') process.exitCode = 1;
+    return;
+  }
+
+  let stdinText = '';
+  try {
+    stdinText = readFileSync(0, 'utf8'); // fd 0: works cross-platform, empty TTY throws
+  } catch { /* no piped stdin: runStatusline returns usage */ }
+  try {
+    mkdirSync(dataDir, { recursive: true });
+    console.log(runStatusline(stdinText, dataDir));
+  } catch (err) {
+    console.log(`🕶 Hindsight (error: ${err instanceof Error ? err.message : String(err)})`);
+  }
+}
+
 async function main(): Promise<void> {
+  if (process.argv[2] === 'statusline') {
+    statuslineCommand();
+    return;
+  }
   const claudeDir = arg('claude-dir', join(homedir(), '.claude'));
   const web = process.argv.includes('--web');
   const plain = process.argv.includes('--plain');
