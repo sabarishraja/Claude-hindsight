@@ -102,6 +102,21 @@ The doc lives under `~/.claude-hindsight/architecture/`, not in your repo —
 terminal briefing, statusline, and web dashboard all show a small nudge when
 the doc has fallen behind the sessions you've actually run.
 
+### MCP: query hindsight live, mid-conversation
+
+`claude-hindsight mcp` runs an MCP server over stdio exposing four tools so Claude can check
+in on hindsight's data whenever it's useful, not just at session start:
+
+- `get_briefing` — the current project's recent sessions and "where you left off" state.
+- `get_architecture` — the cached architecture doc and how stale it is.
+- `run_audit` — the CLAUDE.md instruction audit for this project (and the global one).
+- `refresh_architecture` — regenerates the architecture doc. The only tool that spends time
+  or tokens; everything else is a fast, local read.
+
+None of these ever run the indexer or spend tokens except `refresh_architecture`, and none of
+them ever throw — an unindexed project or missing doc just returns a calm, informative result.
+See "Claude Code plugin" below for the easiest way to wire this in.
+
 ### Show your briefing to Claude at session start
 
 The panel in Claude Code's own welcome screen isn't extensible, but you can do one better:

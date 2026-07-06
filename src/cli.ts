@@ -12,6 +12,8 @@ import type { PolishResult } from './types.js';
 import { runStatusline } from './statusline/statusline.js';
 import { installStatusline } from './statusline/install.js';
 import { refreshArchitecture, getArchitectureView } from './architecture/architecture.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { createMcpServer } from './mcp/server.js';
 
 function arg(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`);
@@ -144,6 +146,20 @@ function statuslineCommand(): void {
   }
 }
 
+// Long-running MCP server over stdio: never returns until the process is
+// killed. Never runs the indexer — same discipline as the statusline — so
+// the Store is opened read-only, and only if index.db already exists.
+async function mcpCommand(): Promise<void> {
+  const dataDir = join(homedir(), '.claude-hindsight');
+  const claudeDir = join(homedir(), '.claude');
+  const dbPath = join(dataDir, 'index.db');
+  const store = existsSync(dbPath) ? new Store(dbPath, { readonly: true }) : null;
+
+  const server = createMcpServer({ store, dataDir, claudeDir, cwd: process.cwd() });
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}
+
 async function architectureCommand(store: Store, dataDir: string): Promise<void> {
   const project = findProjectForCwd(store.listProjects(), process.cwd());
 
@@ -186,6 +202,10 @@ async function architectureCommand(store: Store, dataDir: string): Promise<void>
 async function main(): Promise<void> {
   if (process.argv[2] === 'statusline') {
     statuslineCommand();
+    return;
+  }
+  if (process.argv[2] === 'mcp') {
+    await mcpCommand();
     return;
   }
   const claudeDir = arg('claude-dir', join(homedir(), '.claude'));
