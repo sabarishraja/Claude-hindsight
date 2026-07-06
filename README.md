@@ -74,6 +74,27 @@ node dist/cli.js statusline --install --project  # this project's .claude/settin
 different statusLine unless you pass `--force`. It never runs the indexer —
 row 1 updates when you next run `claude-hindsight` (or your SessionStart hook).
 
+### Architecture: a living map of your codebase
+
+`claude-hindsight architecture` maintains a plain-English doc of your project —
+what it does, its main parts, how they fit together, and a rolling log of recent
+changes — for someone who relies on Claude Code and doesn't read the code
+directly. The first run does a deep, read-only agent exploration of your
+codebase; every run after that is a cheap refresh that only looks at what
+changed since the last one, using the same session index as the briefing.
+
+```bash
+node dist/cli.js architecture             # refresh (if stale) and print
+node dist/cli.js architecture --full      # force a full re-exploration
+node dist/cli.js architecture --write ARCHITECTURE.md   # also export to a repo file
+node dist/cli.js architecture --print     # print the cached doc only, no refresh
+```
+
+The doc lives under `~/.claude-hindsight/architecture/`, not in your repo —
+`--write` is the only thing that ever touches a file in your project. The
+terminal briefing, statusline, and web dashboard all show a small nudge when
+the doc has fallen behind the sessions you've actually run.
+
 ### Show your briefing to Claude at session start
 
 The panel in Claude Code's own welcome screen isn't extensible, but you can do one better:

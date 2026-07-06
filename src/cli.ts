@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { homedir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
-import { mkdirSync, existsSync, readFileSync } from 'node:fs';
+import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { Store } from './indexer/store.js';
 import { indexProjects } from './indexer/indexer.js';
@@ -11,6 +11,7 @@ import { renderBriefing, renderProjectList } from './terminal/render.js';
 import type { PolishResult } from './types.js';
 import { runStatusline } from './statusline/statusline.js';
 import { installStatusline } from './statusline/install.js';
+import { refreshArchitecture, getArchitectureView } from './architecture/architecture.js';
 
 function arg(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`);
@@ -21,6 +22,18 @@ function arg(name: string, fallback: string): string {
 function samePath(a: string, b: string): boolean {
   const norm = (p: string) => resolve(p).replace(/[\\/]+$/, '').toLowerCase();
   return norm(a) === norm(b);
+}
+
+function findProjectForCwd<T extends { cwd: string | null }>(projects: T[], cwd: string): T | undefined {
+  const isUnder = (child: string, parent: string) => {
+    const c = resolve(child).toLowerCase();
+    const p = resolve(parent).toLowerCase();
+    return c.startsWith(p + '\\') || c.startsWith(p + '/');
+  };
+  return (
+    projects.find((p) => p.cwd !== null && samePath(p.cwd, cwd)) ??
+    projects.find((p) => p.cwd !== null && isUnder(cwd, p.cwd))
+  );
 }
 
 async function index(store: Store, claudeDir: string, quiet: boolean): Promise<void> {
@@ -40,18 +53,11 @@ async function index(store: Store, claudeDir: string, quiet: boolean): Promise<v
   if (!quiet && result.indexed > 100) process.stderr.write('\n');
 }
 
-function terminalBriefing(store: Store, plain: boolean): void {
+function terminalBriefing(store: Store, plain: boolean, dataDir: string): void {
   const color = !plain && process.stdout.isTTY === true;
   const projects = store.listProjects();
   const cwd = process.cwd();
-  const isUnder = (child: string, parent: string) => {
-    const c = resolve(child).toLowerCase();
-    const p = resolve(parent).toLowerCase();
-    return c.startsWith(p + '\\') || c.startsWith(p + '/');
-  };
-  const project =
-    projects.find((p) => p.cwd !== null && samePath(p.cwd, cwd)) ??
-    projects.find((p) => p.cwd !== null && isUnder(cwd, p.cwd));
+  const project = findProjectForCwd(projects, cwd);
 
   if (!project) {
     if (plain) return; // hook mode: stay silent in unknown directories
@@ -68,9 +74,17 @@ function terminalBriefing(store: Store, plain: boolean): void {
   const briefing = buildBriefing(project.projectDir, sessions, polish);
   const name = project.cwd ? project.cwd.split(/[\\/]/).filter(Boolean).pop()! : project.projectDir;
   console.log(renderBriefing(briefing, name, { color }));
+
+  const archView = getArchitectureView(store, project.projectDir, dataDir);
+  if (archView.markdown !== null && archView.staleBy > 0) {
+    console.log(
+      `Architecture doc: ${archView.staleBy} session${archView.staleBy === 1 ? '' : 's'} behind — ` +
+      'run `claude-hindsight architecture` to refresh.',
+    );
+  }
 }
 
-async function serveWeb(store: Store, claudeDir: string): Promise<void> {
+async function serveWeb(store: Store, claudeDir: string, dataDir: string): Promise<void> {
   const port = Number(arg('port', '4756'));
   if (!Number.isInteger(port) || port <= 0 || port >= 65536) {
     console.error(`Invalid --port value: ${arg('port', '4756')}. Must be an integer between 1 and 65535.`);
@@ -80,7 +94,7 @@ async function serveWeb(store: Store, claudeDir: string): Promise<void> {
 
   const here = dirname(fileURLToPath(import.meta.url));
   const uiDist = join(here, '..', 'ui', 'dist');
-  const app = createServer(store, { uiDist: existsSync(uiDist) ? uiDist : null, claudeDir });
+  const app = createServer(store, { uiDist: existsSync(uiDist) ? uiDist : null, claudeDir, dataDir });
 
   const server = app.listen(port, '127.0.0.1', async () => {
     const url = `http://localhost:${port}`;
@@ -130,6 +144,40 @@ function statuslineCommand(): void {
   }
 }
 
+async function architectureCommand(store: Store, dataDir: string): Promise<void> {
+  const project = findProjectForCwd(store.listProjects(), process.cwd());
+
+  if (process.argv.includes('--print')) {
+    if (!project) return;
+    const view = getArchitectureView(store, project.projectDir, dataDir);
+    if (view.markdown) console.log(view.markdown);
+    return;
+  }
+
+  if (!project) {
+    console.log('No indexed project matches this directory. Run claude-hindsight first to index it.');
+    process.exitCode = 1;
+    return;
+  }
+
+  const full = process.argv.includes('--full');
+  const result = await refreshArchitecture(store, project.projectDir, { full, dataDir });
+  console.log(result.message);
+  if (result.status === 'error' || result.status === 'rejected') process.exitCode = 1;
+
+  const view = getArchitectureView(store, project.projectDir, dataDir);
+  if (view.markdown) {
+    console.log('');
+    console.log(view.markdown);
+  }
+
+  const writeIdx = process.argv.indexOf('--write');
+  if (writeIdx !== -1 && process.argv[writeIdx + 1] && view.markdown) {
+    writeFileSync(process.argv[writeIdx + 1], view.markdown);
+    console.log(`\nExported to ${process.argv[writeIdx + 1]}`);
+  }
+}
+
 async function main(): Promise<void> {
   if (process.argv[2] === 'statusline') {
     statuslineCommand();
@@ -150,10 +198,16 @@ async function main(): Promise<void> {
 
   await index(store, claudeDir, plain);
 
+  if (process.argv[2] === 'architecture') {
+    await architectureCommand(store, dataDir);
+    store.close();
+    return;
+  }
+
   if (web) {
-    await serveWeb(store, claudeDir);
+    await serveWeb(store, claudeDir, dataDir);
   } else {
-    terminalBriefing(store, plain);
+    terminalBriefing(store, plain, dataDir);
     store.close();
   }
 }
