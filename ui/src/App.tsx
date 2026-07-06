@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchProjects, type ProjectSummary } from './api';
 import Briefing from './views/Briefing';
 import Audit from './views/Audit';
