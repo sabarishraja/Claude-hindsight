@@ -3,3 +3,5 @@ dist/
 ui/node_modules/
 ui/dist/
 *.db
+docs/superpowers/
+.superpowers/
