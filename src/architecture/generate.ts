@@ -65,8 +65,14 @@ const REQUIRED_HEADINGS = [
 
 export function isValidDoc(markdown: string): boolean {
   if (!markdown || markdown.trim().length === 0) return false;
-  const lower = markdown.toLowerCase();
-  return REQUIRED_HEADINGS.every((h) => lower.includes(h));
+  const lines = markdown.split('\n');
+  return REQUIRED_HEADINGS.every((heading) => {
+    return lines.some((line) => {
+      // Match lines that look like "## <heading text>" (case-insensitive, allowing trailing whitespace)
+      const headingRegex = new RegExp(`^##\\s+${heading}\\s*$`, 'i');
+      return headingRegex.test(line);
+    });
+  });
 }
 
 const RECENT_HEADING = /^##\s+Recent changes\s*$/i;

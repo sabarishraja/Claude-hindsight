@@ -47,6 +47,13 @@ describe('isValidDoc', () => {
     expect(isValidDoc('')).toBe(false);
     expect(isValidDoc('## What this app does\nx')).toBe(false);
   });
+
+  it('rejects prose containing heading phrases but no actual markdown headings', () => {
+    const docWithPhrasesOnly = 'Some text that talks about recent changes and the main parts ' +
+      'of the app, discussing how the pieces work together and what this app does, ' +
+      'but with no real headings anywhere.';
+    expect(isValidDoc(docWithPhrasesOnly)).toBe(false);
+  });
 });
 
 describe('trimRecentChanges', () => {
