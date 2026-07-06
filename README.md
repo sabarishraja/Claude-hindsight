@@ -1,4 +1,4 @@
-# claude-dost
+# claude-Hindsight
 
 A local-only dashboard for your Claude Code history. It reads the transcripts Claude Code
 already writes to disk (`~/.claude/projects/**/*.jsonl`), indexes them into a small SQLite
