@@ -5,7 +5,7 @@ export interface RenderOptions {
   width?: number;   // panel width, default 72
 }
 
-const ANSI = {
+export const ANSI = {
   reset: '\x1b[0m',
   dim: '\x1b[2m',
   bold: '\x1b[1m',
@@ -15,7 +15,7 @@ const ANSI = {
   yellow: '\x1b[33m',
 };
 
-const ENDING_LABEL: Record<BriefingCard['ending'], { text: string; color: string }> = {
+export const ENDING_LABEL: Record<BriefingCard['ending'], { text: string; color: string }> = {
   clean: { text: 'clean', color: ANSI.green },
   error: { text: 'error', color: ANSI.red },
   abandoned: { text: 'left open', color: ANSI.yellow },
@@ -35,7 +35,7 @@ export function relativeTime(iso: string | null, now: Date = new Date()): string
   return `${weeks}w ago`;
 }
 
-function truncate(text: string, max: number): string {
+export function truncate(text: string, max: number): string {
   const clean = text.replace(/\s+/g, ' ').trim();
   return clean.length <= max ? clean : clean.slice(0, max - 1).trimEnd() + '…';
 }
