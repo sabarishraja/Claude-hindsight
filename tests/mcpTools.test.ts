@@ -4,8 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Store } from '../src/indexer/store.js';
 import { refreshArchitecture } from '../src/architecture/architecture.js';
-import { getBriefingTool, getArchitectureTool, runAuditTool } from '../src/mcp/tools.js';
+import { getBriefingTool, getArchitectureTool, runAuditTool, refreshArchitectureTool } from '../src/mcp/tools.js';
 import type { SessionFacts } from '../src/types.js';
+import type { ArchRunner } from '../src/architecture/generate.js';
 
 const facts = (over: Partial<SessionFacts>): SessionFacts => ({
   sessionId: 's', projectDir: 'proj', cwd: 'C:\\work\\app', goal: 'ship the thing',
@@ -90,6 +91,49 @@ describe('runAuditTool', () => {
     const body = textOf(runAuditTool(store, claudeDir, 'C:\\work\\app')) as { reports: unknown[]; message: string };
     expect(body.reports).toEqual([]);
     expect(body.message).toContain('No CLAUDE.md');
+    store.close();
+  });
+});
+
+describe('refreshArchitectureTool', () => {
+  it('refreshes and returns the outcome for a matching project', async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'hindsight-mcptools-refresh-'));
+    const store = new Store(':memory:');
+    store.upsertSession(facts({}));
+    const runner: ArchRunner = async () =>
+      '## What this app does\nx\n## The main parts\nx\n' +
+      '## How the pieces work together\nx\n## Recent changes\n- did a thing';
+
+    const result = await refreshArchitectureTool(store, dataDir, 'C:\\work\\app', {}, runner);
+    const body = textOf(result) as { status: string; message: string };
+    expect(body.status).toBe('generated');
+    store.close();
+  });
+
+  it('passes full through to a real re-exploration', async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'hindsight-mcptools-refresh-'));
+    const store = new Store(':memory:');
+    store.upsertSession(facts({}));
+    const calls: { tools: boolean }[] = [];
+    const runner: ArchRunner = async (_prompt, opts) => {
+      calls.push({ tools: opts.tools });
+      return '## What this app does\nx\n## The main parts\nx\n' +
+        '## How the pieces work together\nx\n## Recent changes\n- did a thing';
+    };
+    await refreshArchitectureTool(store, dataDir, 'C:\\work\\app', { full: true }, runner);
+    expect(calls[0].tools).toBe(true);
+    store.close();
+  });
+
+  it('returns a calm error result without calling the runner when no project matches', async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'hindsight-mcptools-refresh-'));
+    const store = new Store(':memory:');
+    let called = false;
+    const runner: ArchRunner = async () => { called = true; return ''; };
+    const result = await refreshArchitectureTool(store, dataDir, 'C:\\nowhere', {}, runner);
+    const body = textOf(result) as { error: string };
+    expect(body.error).toContain('No indexed history');
+    expect(called).toBe(false);
     store.close();
   });
 });

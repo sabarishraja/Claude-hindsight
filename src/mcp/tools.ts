@@ -2,7 +2,8 @@ import type { Store } from '../indexer/store.js';
 import type { PolishResult } from '../types.js';
 import { resolveProject } from './context.js';
 import { buildBriefing } from '../analyzer/briefing.js';
-import { getArchitectureView } from '../architecture/architecture.js';
+import { getArchitectureView, refreshArchitecture } from '../architecture/architecture.js';
+import type { ArchRunner } from '../architecture/generate.js';
 import { discoverClaudeMds } from '../server/configFiles.js';
 import { parseInstructions } from '../analyzer/instructions.js';
 import { auditInstructions } from '../analyzer/audit.js';
@@ -64,4 +65,16 @@ export function runAuditTool(store: Store | null, claudeDir: string, cwd: string
     return auditInstructions(parseInstructions(f.markdown, f.source), sessions);
   });
   return textResult({ reports });
+}
+
+export async function refreshArchitectureTool(
+  store: Store | null, dataDir: string, cwd: string, opts: { full?: boolean }, runner?: ArchRunner,
+): Promise<ToolResult> {
+  const ctx = resolveProject(store, cwd);
+  if (!ctx.ok) return errorResult(ctx.message);
+
+  const outcome = await refreshArchitecture(store!, ctx.project.projectDir, {
+    full: opts.full, dataDir, runner,
+  });
+  return textResult(outcome);
 }
