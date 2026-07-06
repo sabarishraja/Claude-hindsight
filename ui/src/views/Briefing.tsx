@@ -43,7 +43,7 @@ export default function Briefing({ projects, selected, onSelect }: {
       <aside className="w-64 border-r border-zinc-800 overflow-y-auto p-2">
         {projects.length === 0 && (
           <p className="p-4 text-sm text-zinc-500">
-            No transcripts found. claude-dost reads sessions from ~/.claude/projects — run a few Claude Code sessions first.
+            No transcripts found. claude-hindsight reads sessions from ~/.claude/projects — run a few Claude Code sessions first.
           </p>
         )}
         {projects.map((p) => (

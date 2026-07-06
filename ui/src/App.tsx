@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { fetchProjects, type ProjectSummary } from './api';
 import Briefing from './views/Briefing';
 import Audit from './views/Audit';
@@ -18,7 +18,7 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="border-b border-zinc-800 px-6 py-3 flex items-center gap-6">
-        <h1 className="text-lg font-semibold tracking-tight">Claude Dost</h1>
+        <h1 className="text-lg font-semibold tracking-tight">Claude Hindsight</h1>
         <nav className="flex gap-1">
           {(['briefing', 'audit'] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)}

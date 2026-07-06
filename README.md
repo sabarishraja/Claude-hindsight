@@ -1,8 +1,9 @@
-# claude-Hindsight
+# Claude-Hindsight
 
-A local-only dashboard for your Claude Code history. It reads the transcripts Claude Code
+Hindsight for your Claude Code history — 100% local. It reads the transcripts Claude Code
 already writes to disk (`~/.claude/projects/**/*.jsonl`), indexes them into a small SQLite
-database, and serves a two-view web dashboard for browsing what you've actually done.
+database, and shows you where you left off: as a boxed briefing right in your terminal
+(default), or as a two-view web dashboard (`--web`) with a full CLAUDE.md instruction audit.
 
 ## The two views
 
@@ -39,27 +40,53 @@ both need to succeed for the dashboard to have a UI to serve.
 
 ## Run
 
+The default is a **terminal briefing** — run it inside any project you've used Claude Code in,
+and it prints a boxed panel right in your terminal: where you left off, the pending question if
+your last session ended mid-conversation, and your recent sessions with ending badges. No
+server, no browser.
+
 ```bash
-node dist/cli.js
+node dist/cli.js            # terminal briefing for the current directory's project
+node dist/cli.js --web      # full web dashboard (Briefing + Instruction Audit)
 ```
 
 Flags:
 
-- `--port <n>` — HTTP port (default `4756`)
-- `--no-open` — don't auto-open a browser tab
+- `--web` — serve the web dashboard at `http://localhost:4756` instead of printing to the terminal
+- `--plain` — no colors/box-drawing, silent when the directory has no history (for hooks/pipes)
+- `--port <n>` — HTTP port for `--web` (default `4756`)
+- `--no-open` — with `--web`, don't auto-open a browser tab
 - `--claude-dir <path>` — use a Claude directory other than `~/.claude` (mainly for testing)
 
+### Show your briefing to Claude at session start
+
+The panel in Claude Code's own welcome screen isn't extensible, but you can do one better:
+inject the briefing into Claude's context so it *knows* where you left off. Add a
+`SessionStart` hook to `.claude/settings.json` in a project (or your global settings):
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "node <path-to>/dist/cli.js --plain" }] }
+    ]
+  }
+}
+```
+
+Now every new session starts with Claude already briefed on your recent work in that project.
+
 On first run it indexes every transcript file under `<claude-dir>/projects` into
-`~/.claude-dost/index.db`. Later runs only re-index files that changed (by mtime/size), so
+`~/.claude-hindsight/index.db`. Later runs only re-index files that changed (by mtime/size), so
 startup after the first index is fast.
 
 ## Privacy
 
-claude-dost is 100% local:
+claude-hindsight is 100% local:
 
 - It **reads only** your own Claude Code transcripts (`~/.claude/projects/**/*.jsonl`) and
   `CLAUDE.md` files (global and per-project).
-- It **writes only** to `~/.claude-dost/index.db` (a local SQLite file).
+- It **writes only** to `~/.claude-hindsight/index.db` (a local SQLite file).
 - It makes **no network calls** and has **no telemetry** — nothing is sent anywhere.
 - The only process it ever spawns is your already-installed `claude` CLI, and only when you
   explicitly click the per-project **Polish** button in the briefing header. If `claude`

@@ -1,10 +1,10 @@
-{
-  "name": "claude-dost",
+﻿{
+  "name": "claude-hindsight",
   "version": "0.1.0",
   "description": "Local dashboard for Claude Code: project briefings and CLAUDE.md instruction audits from your own transcripts",
   "type": "module",
   "bin": {
-    "claude-dost": "dist/cli.js"
+    "claude-hindsight": "dist/cli.js"
   },
   "engines": {
     "node": ">=20"
