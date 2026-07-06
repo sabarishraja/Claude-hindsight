@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { Store } from '../src/indexer/store.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import Database from 'better-sqlite3';
+import { Store, INDEX_VERSION } from '../src/indexer/store.js';
 import type { SessionFacts } from '../src/types.js';
 
 const facts = (over: Partial<SessionFacts>): SessionFacts => ({
@@ -59,6 +63,46 @@ describe('Store', () => {
     store.setFileMeta('x.jsonl', 123.5, 999);
     expect(store.getFileMeta('x.jsonl')).toEqual({ mtimeMs: 123.5, size: 999 });
     store.close();
+  });
+
+  it('clears file metadata when the index version is outdated, keeping polish cache', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hindsight-store-'));
+    const dbPath = join(dir, 'index.db');
+    try {
+      const store = new Store(dbPath);
+      store.setFileMeta('x.jsonl', 123.5, 999);
+      store.setPolish('s1', { goal: 'Fix login bug', outcome: 'Fixed and tested' });
+      store.close();
+
+      expect(INDEX_VERSION).toBeGreaterThan(0);
+      // Simulate a database written by an older version of the extraction logic
+      // (pre-versioning databases have user_version 0).
+      const raw = new Database(dbPath);
+      raw.pragma('user_version = 0');
+      raw.close();
+
+      const reopened = new Store(dbPath);
+      expect(reopened.getFileMeta('x.jsonl')).toBe(null);
+      expect(reopened.getPolish('s1')).toEqual({ goal: 'Fix login bug', outcome: 'Fixed and tested' });
+      reopened.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps file metadata across reopen at the current index version', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hindsight-store-'));
+    const dbPath = join(dir, 'index.db');
+    try {
+      const store = new Store(dbPath);
+      store.setFileMeta('x.jsonl', 123.5, 999);
+      store.close();
+      const reopened = new Store(dbPath);
+      expect(reopened.getFileMeta('x.jsonl')).toEqual({ mtimeMs: 123.5, size: 999 });
+      reopened.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('caches polish results', () => {

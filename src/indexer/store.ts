@@ -1,6 +1,10 @@
 import Database from 'better-sqlite3';
 import type { SessionFacts, PolishResult } from '../types.js';
 
+// Bump whenever fact extraction changes so existing databases re-index their
+// transcripts; the polish cache survives because it is paid-for LLM output.
+export const INDEX_VERSION = 2;
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS sessions (
   sessionId TEXT PRIMARY KEY, projectDir TEXT NOT NULL, cwd TEXT, goal TEXT,
@@ -38,6 +42,11 @@ export class Store {
     this.db = new Database(dbPath);
     this.db.pragma('journal_mode = WAL');
     this.db.exec(SCHEMA);
+    const version = this.db.pragma('user_version', { simple: true }) as number;
+    if (version !== INDEX_VERSION) {
+      this.db.exec('DELETE FROM files');
+      this.db.pragma(`user_version = ${INDEX_VERSION}`);
+    }
   }
 
   upsertSession(f: SessionFacts): void {

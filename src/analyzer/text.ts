@@ -1,4 +1,4 @@
-const NOISE_TAGS = ['system-reminder', 'command-name', 'command-message', 'command-args', 'local-command-stdout'];
+const NOISE_TAGS = ['system-reminder', 'command-name', 'command-message', 'command-args', 'local-command-stdout', 'local-command-caveat'];
 
 export function stripInjectedNoise(text: string): string {
   let out = text;
