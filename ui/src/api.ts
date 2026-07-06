@@ -29,3 +29,11 @@ export const fetchAudit = () => fetch('/api/audit').then((r) => json<AuditReport
 export const runPolish = (dir: string) =>
   fetch(`/api/projects/${encodeURIComponent(dir)}/polish`, { method: 'POST' })
     .then((r) => json<{ polished: number; failed: number; remaining: number }>(r));
+
+export interface ArchitectureView {
+  markdown: string | null;
+  meta: { docVersion: number; lastRefreshAt: string; coveredThroughTs: string | null } | null;
+  staleBy: number;
+}
+export const fetchArchitecture = (dir: string) =>
+  fetch(`/api/projects/${encodeURIComponent(dir)}/architecture`).then((r) => json<ArchitectureView>(r));
