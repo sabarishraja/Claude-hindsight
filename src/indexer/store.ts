@@ -38,7 +38,11 @@ function rowToFacts(r: SessionRow): SessionFacts {
 export class Store {
   private db: Database.Database;
 
-  constructor(dbPath: string) {
+  constructor(dbPath: string, opts?: { readonly?: boolean }) {
+    if (opts?.readonly) {
+      this.db = new Database(dbPath, { readonly: true, fileMustExist: true });
+      return;
+    }
     this.db = new Database(dbPath);
     this.db.pragma('journal_mode = WAL');
     this.db.exec(SCHEMA);

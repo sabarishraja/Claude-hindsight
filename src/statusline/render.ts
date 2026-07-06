@@ -28,7 +28,7 @@ export function renderStatusline(view: StatuslineView, now: Date = new Date()): 
   } else if (!view.last) {
     row1 = p(ANSI.dim, 'no previous sessions here');
   } else {
-    const badge = ENDING_LABEL[view.last.ending];
+    const badge = ENDING_LABEL[view.last.ending] ?? ENDING_LABEL.clean;
     const head = `◷ ${relativeTime(view.last.when, now)} `;
     const tail = view.last.pendingQuestion ? ' · ⚠ pending question' : '';
     const room = Math.max(20, MAX_WIDTH - head.length - badge.text.length - 3 - tail.length);

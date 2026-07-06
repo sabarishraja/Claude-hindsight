@@ -51,7 +51,7 @@ export function runStatusline(stdinText: string, dataDir: string): string {
     sessionCount: 0,
   };
 
-  if (typeof data.transcript_path === 'string') {
+  if (typeof data.transcript_path === 'string' && /^[A-Za-z0-9._-]+$/.test(data.session_id)) {
     const statePath = join(dataDir, 'statusline', `${data.session_id}.json`);
     const live = updateLiveStats(statePath, data.transcript_path);
     view.liveFiles = live.files;
@@ -61,7 +61,7 @@ export function runStatusline(stdinText: string, dataDir: string): string {
   const dbPath = join(dataDir, 'index.db');
   if (existsSync(dbPath)) {
     view.indexed = true;
-    const store = new Store(dbPath);
+    const store = new Store(dbPath, { readonly: true });
     try {
       const cwd = data.workspace?.project_dir ?? data.workspace?.current_dir ?? process.cwd();
       const project = findProjectForCwd(store.listProjects(), cwd);
@@ -75,7 +75,7 @@ export function runStatusline(stdinText: string, dataDir: string): string {
           if (p) polish.set(s.sessionId, p);
         }
         const briefing = buildBriefing(project.projectDir, sessions, polish);
-        view.sessionCount = briefing.cards.length;
+        view.sessionCount = store.getSessions(project.projectDir).length;
         const latest = briefing.cards[0];
         if (latest) {
           view.last = {

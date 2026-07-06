@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
 import { Store } from '../src/indexer/store.js';
 import { runStatusline, USAGE } from '../src/statusline/statusline.js';
 import type { SessionFacts } from '../src/types.js';
@@ -61,7 +62,7 @@ describe('runStatusline', () => {
     expect(row2).toContain('Fable 5');
     expect(row2).toContain('$0.12');
     expect(row2).toContain('1 files · 1 cmds');
-    expect(row2).toContain('1 session indexed');
+    expect(row2).toContain('2 sessions indexed');
   });
 
   it('matches a subdirectory of the project cwd', () => {
@@ -86,5 +87,46 @@ describe('runStatusline', () => {
     const out = strip(runStatusline(JSON.stringify({ session_id: 's1' }), dataDir));
     expect(out.split('\n')[0]).toContain('run claude-hindsight to index');
     expect(out.split('\n')[1]).toContain('🕶 Hindsight');
+  });
+
+  it('never writes to the index db, even across a version bump', () => {
+    const { dataDir, transcript } = setup();
+    const dbPath = join(dataDir, 'index.db');
+
+    // Simulate a version-skewed db with a marker row, using better-sqlite3 directly.
+    const raw = new Database(dbPath);
+    raw.pragma('user_version = 999');
+    raw.prepare("INSERT INTO files (path, mtimeMs, size) VALUES ('m', 1, 1)").run();
+    raw.close();
+
+    runStatusline(stdinFor(dataDir, transcript), dataDir);
+
+    const check = new Database(dbPath, { readonly: true });
+    const marker = check.prepare("SELECT * FROM files WHERE path = 'm'").get();
+    const version = check.pragma('user_version', { simple: true });
+    check.close();
+    expect(marker).toBeDefined();
+    expect(version).toBe(999);
+  });
+
+  it('sanitizes session_id and never escapes the statusline state dir', () => {
+    const { dataDir, transcript } = setup();
+    const stdin = JSON.stringify({
+      ...JSON.parse(stdinFor(dataDir, transcript)) as object,
+      session_id: '..\\..\\escape',
+    });
+    const out = strip(runStatusline(stdin, dataDir));
+    const rows = out.split('\n');
+    expect(rows.length).toBe(2);
+
+    const entries = readdirSync(dataDir);
+    const allowed = /^(index\.db(-shm|-wal)?|statusline|live\.jsonl)$/;
+    for (const entry of entries) {
+      expect(entry).toMatch(allowed);
+    }
+    const statuslineDir = join(dataDir, 'statusline');
+    if (existsSync(statuslineDir)) {
+      expect(readdirSync(statuslineDir)).toEqual([]);
+    }
   });
 });
