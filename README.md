@@ -3,9 +3,11 @@
 Hindsight for your Claude Code history — 100% local. It reads the transcripts Claude Code
 already writes to disk (`~/.claude/projects/**/*.jsonl`), indexes them into a small SQLite
 database, and shows you where you left off: as a boxed briefing right in your terminal
-(default), or as a two-view web dashboard (`--web`) with a full CLAUDE.md instruction audit.
+(default), or as a three-view web dashboard (`--web`) with a living architecture doc and a
+full CLAUDE.md instruction audit. It also plugs directly into Claude Code itself via a
+statusline and a `SessionStart` hook, so you don't have to run a separate command to see it.
 
-## The two views
+## The three dashboard views
 
 **Project Briefing** — a per-project timeline of sessions: extracted goal (from your first
 message), files edited, commands run, tokens used, duration, and an ending badge
@@ -14,6 +16,11 @@ built from the most recent session, with a single per-project **✨ Polish** but
 shells out to your locally-installed `claude` CLI to rewrite the goal/outcome of unpolished
 sessions into cleaner one-sentence summaries; results are cached in SQLite so you only pay
 for it once per session.
+
+**Architecture** — a living, plain-English description of the codebase itself: what it does,
+its main parts, how they fit together, and a rolling log of recent changes — written for
+someone who relies on Claude Code and doesn't read the code directly. See the "Architecture"
+section under Run below for how it's generated and kept fresh.
 
 **Instruction Audit** — parses your global `~/.claude/CLAUDE.md` and any per-project
 `CLAUDE.md` files into discrete rules (one per bullet/paragraph), then cross-examines each
@@ -166,9 +173,26 @@ matching. Concretely, per rule:
   that shells out to `claude -p` is the reusable piece a future `--deep` mode would build on,
   but v1 ships static-only by design.
 
+## Command reference
+
+| Command | What it does |
+| --- | --- |
+| `node dist/cli.js` | Terminal briefing for the current directory's project |
+| `node dist/cli.js --web` | Web dashboard (Briefing + Architecture + Instruction Audit) at `http://localhost:4756` |
+| `node dist/cli.js --plain` | No colors/box-drawing; silent if the directory has no history (for hooks/pipes) |
+| `node dist/cli.js --port <n>` | HTTP port for `--web` (default `4756`) |
+| `node dist/cli.js --no-open` | With `--web`, don't auto-open a browser tab |
+| `node dist/cli.js --claude-dir <path>` | Use a Claude directory other than `~/.claude` (mainly for testing) |
+| `node dist/cli.js statusline` | Render one two-row statusline frame from Claude Code's stdin JSON (used internally by the statusLine setting, not run by hand) |
+| `node dist/cli.js statusline --install [--project] [--force]` | Wire the statusline into `~/.claude/settings.json` (or `--project` for this project's `.claude/settings.json`) |
+| `node dist/cli.js architecture` | Refresh the architecture doc if stale, then print it |
+| `node dist/cli.js architecture --full` | Force a full re-exploration of the codebase (agentic, read-only) instead of an incremental refresh |
+| `node dist/cli.js architecture --write <path>` | Also export the current doc to a file in your repo |
+| `node dist/cli.js architecture --print` | Print the cached doc only — never refreshes, never calls an LLM |
+
 ## Screenshots
 
-_(placeholder — add screenshots of the Project Briefing and Instruction Audit views here)_
+_(placeholder — add screenshots of the Project Briefing, Architecture, and Instruction Audit views here)_
 
 ## Development
 
