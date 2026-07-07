@@ -1,11 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { renderStatusline, formatTokenCount, type StatuslineView } from '../src/statusline/render.js';
+import {
+  renderStatusline, formatTokenCount, formatResetCountdown, renderBar, contextSuffix, getContextLimit,
+  type StatuslineView,
+} from '../src/statusline/render.js';
 
 const strip = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
 
 const base: StatuslineView = {
   last: null, indexed: true, modelName: 'Fable 5', costUsd: 0.42,
   liveFiles: 3, liveCommands: 12, sessionCount: 47, windowTokens: 342_000,
+  resetMinutesRemaining: null, context: null,
 };
 
 describe('formatTokenCount', () => {
@@ -18,25 +22,89 @@ describe('formatTokenCount', () => {
   });
 });
 
+describe('formatResetCountdown', () => {
+  it('formats minutes-only under an hour', () => {
+    expect(formatResetCountdown(0)).toBe('resets in 0m');
+    expect(formatResetCountdown(45)).toBe('resets in 45m');
+  });
+
+  it('formats hours and minutes at and above 60 minutes', () => {
+    expect(formatResetCountdown(60)).toBe('resets in 1h 0m');
+    expect(formatResetCountdown(90)).toBe('resets in 1h 30m');
+    expect(formatResetCountdown(125)).toBe('resets in 2h 5m');
+  });
+});
+
+describe('renderBar', () => {
+  it('fills proportionally at representative percentages, clamped to 10 chars', () => {
+    expect(renderBar(0, 200_000)).toBe('░░░░░░░░░░');
+    expect(renderBar(100_000, 200_000)).toBe('█████░░░░░');
+    expect(renderBar(125_000, 200_000)).toBe('██████░░░░'); // 6.25 -> rounds to 6
+    expect(renderBar(185_000, 200_000)).toBe('█████████░'); // 9.25 -> rounds to 9
+    expect(renderBar(200_000, 200_000)).toBe('██████████');
+    expect(renderBar(250_000, 200_000)).toBe('██████████'); // over 100%, clamped
+  });
+});
+
+describe('contextSuffix', () => {
+  it('returns the right suffix at representative percentages, boundaries exclusive', () => {
+    expect(contextSuffix(50_000, 200_000)).toBe(''); // 25%
+    expect(contextSuffix(140_000, 200_000)).toBe(''); // exactly 70%, not > 70
+    expect(contextSuffix(140_001, 200_000)).toBe(' (large codebase loaded)'); // just over 70%
+    expect(contextSuffix(180_000, 200_000)).toBe(' (large codebase loaded)'); // exactly 90%, not > 90
+    expect(contextSuffix(180_001, 200_000)).toBe(' (near limit — consider /compact)'); // just over 90%
+  });
+});
+
+describe('getContextLimit', () => {
+  it('defaults to 200K for any model name, including unknown or null', () => {
+    expect(getContextLimit('Fable 5')).toBe(200_000);
+    expect(getContextLimit('Some Future Model')).toBe(200_000);
+    expect(getContextLimit(null)).toBe(200_000);
+  });
+});
+
 describe('renderStatusline', () => {
-  it('renders two rows with last-session story and live segments', () => {
+  it('renders two rows with last-session story and live segments when context is absent', () => {
     const view: StatuslineView = {
       ...base,
       last: { when: '2026-07-06T08:00:00Z', ending: 'error', goal: 'fix: strip BOMs from rename script', pendingQuestion: false },
     };
     const out = strip(renderStatusline(view, new Date('2026-07-06T10:00:00Z')));
-    const [row1, row2] = out.split('\n');
-    expect(row1).toContain('2h ago');
-    expect(row1).toContain('[error]');
-    expect(row1).toContain('fix: strip BOMs from rename script');
-    expect(row1).not.toContain('pending question');
-    expect(row2).toContain('🕶 Hindsight');
-    expect(row2).toContain('Fable 5');
-    expect(row2).toContain('$0.42');
-    expect(row2).toContain('342K tok · 5h');
-    expect(row2).toContain('3 files · 12 cmds');
-    expect(row2).toContain('47 sessions indexed');
+    const rows = out.split('\n');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toContain('2h ago');
+    expect(rows[0]).toContain('[error]');
+    expect(rows[1]).toContain('🕶 Hindsight');
+    expect(rows[1]).toContain('Fable 5');
+    expect(rows[1]).toContain('$0.42');
+    expect(rows[1]).toContain('342K tok · 5h');
+    expect(rows[1]).not.toContain('resets in');
+    expect(rows[1]).toContain('3 files · 12 cmds');
+    expect(rows[1]).toContain('47 sessions indexed');
+  });
+
+  it('appends a reset countdown to the token segment when resetMinutesRemaining is set', () => {
+    const view: StatuslineView = { ...base, resetMinutesRemaining: 72 };
+    const row2 = strip(renderStatusline(view)).split('\n')[1];
+    expect(row2).toContain('342K tok · 5h — resets in 1h 12m');
+  });
+
+  it('adds a third Context row when context is set, with bar/numbers/suffix', () => {
+    const view: StatuslineView = { ...base, context: { used: 168_000, limit: 200_000 } };
+    const out = strip(renderStatusline(view));
+    const rows = out.split('\n');
+    expect(rows).toHaveLength(3);
+    expect(rows[2]).toContain('Context');
+    expect(rows[2]).toContain('168K');
+    expect(rows[2]).toContain('200K');
+    expect(rows[2]).toContain('large codebase loaded');
+  });
+
+  it('omits the Context row entirely when context is null', () => {
+    const out = strip(renderStatusline({ ...base, context: null }));
     expect(out.split('\n')).toHaveLength(2);
+    expect(out).not.toContain('Context');
   });
 
   it('flags a pending question for abandoned sessions', () => {

@@ -15,7 +15,9 @@ export interface StatuslineView {
   liveFiles: number;
   liveCommands: number;
   sessionCount: number;
-  windowTokens: number;          // tokens used across all projects in the trailing 5 hours
+  windowTokens: number;                  // tokens used across all projects in the trailing 5 hours
+  resetMinutesRemaining: number | null;  // null => no real, still-future reset time detected
+  context: { used: number; limit: number } | null; // null => no assistant turn yet this session
   archStaleBy?: number;          // undefined/0 => no nudge; >0 => sessions behind
 }
 
@@ -29,6 +31,44 @@ export function formatTokenCount(n: number): string {
   }
   const m = n / 1_000_000;
   return (n < 10_000_000 ? m.toFixed(1) : Math.round(m).toString()) + 'M';
+}
+
+export function formatResetCountdown(minutes: number): string {
+  if (minutes < 60) return `resets in ${minutes}m`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `resets in ${h}h ${m}m`;
+}
+
+export function renderBar(used: number, limit: number): string {
+  const filled = Math.max(0, Math.min(10, Math.round((used / limit) * 10)));
+  return '█'.repeat(filled) + '░'.repeat(10 - filled);
+}
+
+export function contextSuffix(used: number, limit: number): string {
+  const pct = used / limit;
+  if (pct > 0.9) return ' (near limit — consider /compact)';
+  if (pct > 0.7) return ' (large codebase loaded)';
+  return '';
+}
+
+// Empty today: no locally-visible signal distinguishes a model running with the opt-in
+// 1M-context beta from one on the 200K default, so every known display name resolves to the
+// same safe default below. Add entries here only when a model's *default* (non-beta) context
+// window genuinely differs from 200K.
+const MODEL_CONTEXT_LIMITS: Record<string, number> = {};
+const DEFAULT_CONTEXT_LIMIT = 200_000;
+
+export function getContextLimit(modelName: string | null): number {
+  if (modelName && modelName in MODEL_CONTEXT_LIMITS) return MODEL_CONTEXT_LIMITS[modelName];
+  return DEFAULT_CONTEXT_LIMIT;
+}
+
+function contextColor(used: number, limit: number): string {
+  const pct = used / limit;
+  if (pct > 0.9) return ANSI.red;
+  if (pct > 0.7) return ANSI.yellow;
+  return '';
 }
 
 export function renderStatusline(view: StatuslineView, now: Date = new Date()): string {
@@ -58,9 +98,20 @@ export function renderStatusline(view: StatuslineView, now: Date = new Date()): 
   const segments: string[] = [p(ANSI.bold + ANSI.orange, '🕶 Hindsight')];
   if (view.modelName) segments.push(view.modelName);
   if (view.costUsd !== null) segments.push(`$${view.costUsd.toFixed(2)}`);
-  segments.push(`${formatTokenCount(view.windowTokens)} tok · 5h`);
+  const resetSuffix = view.resetMinutesRemaining !== null
+    ? ` — ${formatResetCountdown(view.resetMinutesRemaining)}` : '';
+  segments.push(`${formatTokenCount(view.windowTokens)} tok · 5h${resetSuffix}`);
   segments.push(`${view.liveFiles} files · ${view.liveCommands} cmds`);
   segments.push(p(ANSI.dim, `${view.sessionCount} session${view.sessionCount === 1 ? '' : 's'} indexed`));
 
-  return row1 + '\n' + segments.join(p(ANSI.orange, ' │ '));
+  const row2 = row1 + '\n' + segments.join(p(ANSI.orange, ' │ '));
+
+  if (view.context === null) return row2;
+
+  const { used, limit } = view.context;
+  const color = contextColor(used, limit);
+  const bar = color ? p(color, renderBar(used, limit)) : renderBar(used, limit);
+  const row3 = `Context  ${bar} ${formatTokenCount(used)}/${formatTokenCount(limit)}${contextSuffix(used, limit)}`;
+
+  return row2 + '\n' + row3;
 }
