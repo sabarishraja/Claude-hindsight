@@ -114,3 +114,7 @@ data needs to reach argv).
   tested primarily on Windows.
 - Every read-only surface (statusline, briefing nudge, dashboard "no doc" states) treats
   "no data yet" and "stale" as calm, non-error states — never a thrown error or a blank crash.
+- Never add a `Co-Authored-By: Claude ...` (or any AI-attribution) trailer to commit messages
+  in this repo. This applies to every commit, including ones made by a dispatched subagent —
+  when writing commit-message instructions for a subagent, omit the trailer entirely rather
+  than including and later stripping it.
