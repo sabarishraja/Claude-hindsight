@@ -7,7 +7,7 @@ const session = (over: Partial<SessionFacts>): SessionFacts => ({
   firstTs: '2026-07-01T10:00:00Z', lastTs: '2026-07-01T10:30:00Z', messageCount: 6,
   inputTokens: 5000, outputTokens: 800, filesEdited: ['a.ts'], commandsRun: ['npm test', 'git add .'],
   skillsInvoked: [], errorCount: 0, ending: 'clean', lastUserText: 'thanks',
-  lastAssistantText: 'All done.', skippedLines: 0, ...over,
+  lastAssistantText: 'All done.', skippedLines: 0, rateLimitResetAt: null, ...over,
 });
 
 describe('buildBriefing', () => {

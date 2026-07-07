@@ -3,14 +3,15 @@ import type { SessionFacts, PolishResult } from '../types.js';
 
 // Bump whenever fact extraction changes so existing databases re-index their
 // transcripts; the polish cache survives because it is paid-for LLM output.
-export const INDEX_VERSION = 2;
+export const INDEX_VERSION = 3;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS sessions (
   sessionId TEXT PRIMARY KEY, projectDir TEXT NOT NULL, cwd TEXT, goal TEXT,
   firstTs TEXT, lastTs TEXT, messageCount INTEGER, inputTokens INTEGER, outputTokens INTEGER,
   filesEdited TEXT, commandsRun TEXT, skillsInvoked TEXT,
-  errorCount INTEGER, ending TEXT, lastUserText TEXT, lastAssistantText TEXT, skippedLines INTEGER
+  errorCount INTEGER, ending TEXT, lastUserText TEXT, lastAssistantText TEXT, skippedLines INTEGER,
+  rateLimitResetAt TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(projectDir, lastTs);
 CREATE TABLE IF NOT EXISTS files (path TEXT PRIMARY KEY, mtimeMs REAL, size INTEGER);
@@ -23,6 +24,7 @@ interface SessionRow {
   inputTokens: number; outputTokens: number; filesEdited: string; commandsRun: string;
   skillsInvoked: string; errorCount: number; ending: string;
   lastUserText: string | null; lastAssistantText: string | null; skippedLines: number;
+  rateLimitResetAt: string | null;
 }
 
 function rowToFacts(r: SessionRow): SessionFacts {
@@ -57,9 +59,11 @@ export class Store {
     this.db.prepare(`
       INSERT OR REPLACE INTO sessions
       (sessionId, projectDir, cwd, goal, firstTs, lastTs, messageCount, inputTokens, outputTokens,
-       filesEdited, commandsRun, skillsInvoked, errorCount, ending, lastUserText, lastAssistantText, skippedLines)
+       filesEdited, commandsRun, skillsInvoked, errorCount, ending, lastUserText, lastAssistantText,
+       skippedLines, rateLimitResetAt)
       VALUES (@sessionId, @projectDir, @cwd, @goal, @firstTs, @lastTs, @messageCount, @inputTokens, @outputTokens,
-       @filesEdited, @commandsRun, @skillsInvoked, @errorCount, @ending, @lastUserText, @lastAssistantText, @skippedLines)
+       @filesEdited, @commandsRun, @skillsInvoked, @errorCount, @ending, @lastUserText, @lastAssistantText,
+       @skippedLines, @rateLimitResetAt)
     `).run({
       ...f,
       filesEdited: JSON.stringify(f.filesEdited),
@@ -114,6 +118,13 @@ export class Store {
   setPolish(sessionId: string, p: PolishResult): void {
     this.db.prepare('INSERT OR REPLACE INTO polish (sessionId, goal, outcome) VALUES (?, ?, ?)')
       .run(sessionId, p.goal, p.outcome);
+  }
+
+  getLatestRateLimitReset(): string | null {
+    const row = this.db.prepare(
+      'SELECT MAX(rateLimitResetAt) AS latest FROM sessions WHERE rateLimitResetAt IS NOT NULL',
+    ).get() as { latest: string | null };
+    return row.latest;
   }
 
   close(): void { this.db.close(); }

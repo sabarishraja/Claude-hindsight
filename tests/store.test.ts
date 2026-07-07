@@ -11,7 +11,7 @@ const facts = (over: Partial<SessionFacts>): SessionFacts => ({
   firstTs: '2026-07-01T10:00:00Z', lastTs: '2026-07-01T11:00:00Z', messageCount: 4,
   inputTokens: 1000, outputTokens: 200, filesEdited: ['a.ts'], commandsRun: ['npm test'],
   skillsInvoked: [], errorCount: 0, ending: 'clean', lastUserText: 'thanks',
-  lastAssistantText: 'done', skippedLines: 0, ...over,
+  lastAssistantText: 'done', skippedLines: 0, rateLimitResetAt: null, ...over,
 });
 
 describe('Store', () => {
@@ -154,6 +154,30 @@ describe('Store', () => {
     it('returns 0 when there are no sessions at all', () => {
       const store = new Store(':memory:');
       expect(store.getTokensSince('2026-01-01T00:00:00Z')).toBe(0);
+      store.close();
+    });
+  });
+
+  describe('getLatestRateLimitReset', () => {
+    it('returns the max reset time across all sessions', () => {
+      const store = new Store(':memory:');
+      store.upsertSession(facts({ sessionId: 'a', rateLimitResetAt: '2026-07-01T10:00:00Z' }));
+      store.upsertSession(facts({ sessionId: 'b', rateLimitResetAt: '2026-07-02T10:00:00Z' }));
+      store.upsertSession(facts({ sessionId: 'c', rateLimitResetAt: null }));
+      expect(store.getLatestRateLimitReset()).toBe('2026-07-02T10:00:00Z');
+      store.close();
+    });
+
+    it('returns null when no session has a rate-limit reset recorded', () => {
+      const store = new Store(':memory:');
+      store.upsertSession(facts({ sessionId: 'a', rateLimitResetAt: null }));
+      expect(store.getLatestRateLimitReset()).toBe(null);
+      store.close();
+    });
+
+    it('returns null on an empty table', () => {
+      const store = new Store(':memory:');
+      expect(store.getLatestRateLimitReset()).toBe(null);
       store.close();
     });
   });

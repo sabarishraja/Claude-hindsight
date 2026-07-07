@@ -7,6 +7,7 @@ const facts: SessionFacts = {
   firstTs: null, lastTs: null, messageCount: 8, inputTokens: 0, outputTokens: 0,
   filesEdited: ['auth.ts'], commandsRun: ['npm test'], skillsInvoked: [], errorCount: 0,
   ending: 'clean', lastUserText: null, lastAssistantText: 'Fixed and tests pass.', skippedLines: 0,
+  rateLimitResetAt: null,
 };
 
 describe('polishSession', () => {

@@ -10,6 +10,7 @@ export interface SessionFacts {
   messageCount: number;      // text-bearing user + assistant messages; sidechains and tool_result-only records excluded
   inputTokens: number;
   outputTokens: number;
+  rateLimitResetAt: string | null; // latest rate-limit reset time observed in this session, if any
   filesEdited: string[];     // from Edit/Write/NotebookEdit tool_use inputs
   commandsRun: string[];     // from Bash/PowerShell tool_use inputs
   skillsInvoked: string[];   // from Skill tool_use inputs

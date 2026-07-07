@@ -19,7 +19,7 @@ const facts = (over: Partial<SessionFacts>): SessionFacts => ({
   firstTs: null, lastTs: '2026-07-01T00:00:00Z', messageCount: 1,
   inputTokens: 0, outputTokens: 0, filesEdited: ['src/a.ts'], commandsRun: [],
   skillsInvoked: [], errorCount: 0, ending: 'clean',
-  lastUserText: null, lastAssistantText: null, skippedLines: 0,
+  lastUserText: null, lastAssistantText: null, skippedLines: 0, rateLimitResetAt: null,
   ...over,
 });
 

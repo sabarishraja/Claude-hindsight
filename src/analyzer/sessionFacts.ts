@@ -1,5 +1,6 @@
 import type { SessionFacts, SessionEnding } from '../types.js';
 import { extractMessageText } from './text.js';
+import { extractRateLimitReset } from './rateLimit.js';
 
 type Rec = Record<string, unknown>;
 
@@ -24,6 +25,7 @@ export function extractSessionFacts(
   let inputTokens = 0;
   let outputTokens = 0;
   let errorCount = 0;
+  let rateLimitResetAt: string | null = null;
   let lastUserText: string | null = null;
   let lastAssistantText: string | null = null;
   const filesEdited = new Set<string>();
@@ -49,6 +51,8 @@ export function extractSessionFacts(
         }
         if (typeof usage['output_tokens'] === 'number') outputTokens += usage['output_tokens'] as number;
       }
+      const reset = extractRateLimitReset(rec);
+      if (reset !== null) rateLimitResetAt = reset;
       for (const b of contentBlocks(rec)) {
         if (b['type'] !== 'tool_use') continue;
         const name = b['name'];
@@ -91,7 +95,7 @@ export function extractSessionFacts(
 
   return {
     sessionId, projectDir, cwd, goal, firstTs, lastTs, messageCount,
-    inputTokens, outputTokens,
+    inputTokens, outputTokens, rateLimitResetAt,
     filesEdited: [...filesEdited], commandsRun, skillsInvoked: [...skillsInvoked],
     errorCount, ending, lastUserText, lastAssistantText, skippedLines,
   };

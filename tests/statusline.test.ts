@@ -17,6 +17,7 @@ function facts(over: Partial<SessionFacts>): SessionFacts {
     messageCount: 4, inputTokens: 10, outputTokens: 10,
     filesEdited: [], commandsRun: [], skillsInvoked: [], errorCount: 0,
     ending: 'clean', lastUserText: null, lastAssistantText: null, skippedLines: 0,
+    rateLimitResetAt: null,
     ...over,
   };
 }

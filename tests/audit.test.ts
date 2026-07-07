@@ -10,7 +10,7 @@ const session = (over: Partial<SessionFacts>): SessionFacts => ({
   sessionId: 's1', projectDir: 'p', cwd: null, goal: 'goal', firstTs: null, lastTs: null,
   messageCount: 2, inputTokens: 100, outputTokens: 10, filesEdited: [], commandsRun: [],
   skillsInvoked: [], errorCount: 0, ending: 'clean', lastUserText: null,
-  lastAssistantText: null, skippedLines: 0, ...over,
+  lastAssistantText: null, skippedLines: 0, rateLimitResetAt: null, ...over,
 });
 
 describe('auditInstructions', () => {

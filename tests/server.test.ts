@@ -13,7 +13,7 @@ const session = (over: Partial<SessionFacts>): SessionFacts => ({
   firstTs: '2026-07-01T10:00:00Z', lastTs: '2026-07-01T10:30:00Z', messageCount: 4,
   inputTokens: 1000, outputTokens: 100, filesEdited: [], commandsRun: ['npm install'],
   skillsInvoked: [], errorCount: 0, ending: 'clean', lastUserText: null,
-  lastAssistantText: null, skippedLines: 0, ...over,
+  lastAssistantText: null, skippedLines: 0, rateLimitResetAt: null, ...over,
 });
 
 let server: Server;

@@ -108,4 +108,27 @@ describe('extractSessionFacts', () => {
     expect(facts.ending).toBe('clean');
     expect(facts.skippedLines).toBe(3);
   });
+
+  it('records the latest rate-limit reset time seen in the session', () => {
+    const rateLimitHit = (text: string, ts: string) => ({
+      type: 'assistant', timestamp: ts,
+      message: { role: 'assistant', content: [{ type: 'text', text }] },
+      error: 'rate_limit', isApiErrorMessage: true,
+    });
+    const facts = extractSessionFacts([
+      user('please help me debug this failing test case'),
+      rateLimitHit("resets 1:00pm (America/Chicago)", '2026-06-23T10:00:00.000Z'),
+      rateLimitHit("resets 3:00pm (America/Chicago)", '2026-06-23T14:00:00.000Z'),
+    ], 's1', 'proj', 0);
+    // second hit's reset time supersedes the first (last-write-wins over the record stream)
+    expect(facts.rateLimitResetAt).toBe('2026-06-23T20:00:00.000Z');
+  });
+
+  it('leaves rateLimitResetAt null when no rate-limit record is present', () => {
+    const facts = extractSessionFacts([
+      user('add a dark mode toggle to the settings page'),
+      assistant([{ type: 'text', text: 'Done. Dark mode toggle added.' }]),
+    ], 's1', 'proj', 0);
+    expect(facts.rateLimitResetAt).toBe(null);
+  });
 });
