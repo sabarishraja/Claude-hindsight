@@ -67,7 +67,9 @@ describe('createMcpServer', () => {
     const runner: ArchRunner = async (_prompt, opts) => {
       calls.push({ tools: opts.tools });
       return '## What this app does\nx\n## The main parts\nx\n' +
-        '## How the pieces work together\nx\n## Recent changes\n- did a thing';
+        '## How the pieces work together\nx\n' +
+        '## Architecture Diagram\n```mermaid\nflowchart TD\n  A --> B\n```\n' +
+        '## Recent changes\n- did a thing';
     };
     const client = await connectedClient({ store, dataDir, claudeDir: '/tmp/unused', cwd: 'C:\\work\\app', runner });
     const result = await client.callTool({ name: 'refresh_architecture', arguments: { full: true } });

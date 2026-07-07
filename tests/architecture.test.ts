@@ -10,7 +10,9 @@ import type { SessionFacts } from '../src/types.js';
 
 const VALID_DOC =
   '## What this app does\nx\n## The main parts\nx\n' +
-  '## How the pieces work together\nx\n## Recent changes\n- did a thing';
+  '## How the pieces work together\nx\n' +
+  '## Architecture Diagram\n```mermaid\nflowchart TD\n  A --> B\n```\n' +
+  '## Recent changes\n- did a thing';
 
 const facts = (over: Partial<SessionFacts>): SessionFacts => ({
   sessionId: 's', projectDir: 'proj', cwd: 'C:\\work\\proj', goal: 'build the thing',
@@ -87,6 +89,23 @@ describe('refreshArchitecture', () => {
 
     expect(result.status).toBe('generated');
     expect(calls[0].opts.tools).toBe(true);
+  });
+
+  it('forces a full regeneration when the existing doc predates the diagram heading, even if not stale', async () => {
+    const { dataDir, store } = setup();
+    const OLD_DOC_NO_DIAGRAM =
+      '## What this app does\nx\n## The main parts\nx\n' +
+      '## How the pieces work together\nx\n## Recent changes\n- did a thing';
+    await refreshArchitecture(store, 'proj', { dataDir, runner: async () => OLD_DOC_NO_DIAGRAM });
+
+    const calls: { opts: { tools: boolean } }[] = [];
+    const runner: ArchRunner = async (_p, opts) => { calls.push({ opts }); return VALID_DOC; };
+    const result = await refreshArchitecture(store, 'proj', { dataDir, runner });
+
+    expect(result.status).toBe('generated');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].opts.tools).toBe(true);
+    expect(readArchitectureDoc(dataDir, 'proj')?.markdown).toBe(VALID_DOC);
   });
 
   it('keeps the previous doc when the runner throws', async () => {

@@ -86,7 +86,9 @@ describe('API', () => {
       dataDir: archDataDir,
       runner: async () =>
         '## What this app does\nx\n## The main parts\nx\n' +
-        '## How the pieces work together\nx\n## Recent changes\n- did a thing',
+        '## How the pieces work together\nx\n' +
+        '## Architecture Diagram\n```mermaid\nflowchart TD\n  A --> B\n```\n' +
+        '## Recent changes\n- did a thing',
     });
     const archApp = createServer(archStore, { uiDist: null, claudeDir: archClaudeDir, dataDir: archDataDir });
     let archServer: Server;

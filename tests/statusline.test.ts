@@ -135,7 +135,9 @@ describe('runStatusline', () => {
     const { dataDir, transcript } = setup();
     const VALID_DOC =
       '## What this app does\nx\n## The main parts\nx\n' +
-      '## How the pieces work together\nx\n## Recent changes\n- did a thing';
+      '## How the pieces work together\nx\n' +
+      '## Architecture Diagram\n```mermaid\nflowchart TD\n  A --> B\n```\n' +
+      '## Recent changes\n- did a thing';
     const store = new Store(join(dataDir, 'index.db'));
     await refreshArchitecture(store, 'proj', { dataDir, runner: async () => VALID_DOC });
     store.upsertSession(facts({

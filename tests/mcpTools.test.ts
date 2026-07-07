@@ -58,7 +58,9 @@ describe('getArchitectureTool', () => {
       dataDir,
       runner: async () =>
         '## What this app does\nx\n## The main parts\nx\n' +
-        '## How the pieces work together\nx\n## Recent changes\n- did a thing',
+        '## How the pieces work together\nx\n' +
+        '## Architecture Diagram\n```mermaid\nflowchart TD\n  A --> B\n```\n' +
+        '## Recent changes\n- did a thing',
     });
     const body = textOf(getArchitectureTool(store, dataDir, 'C:\\work\\app')) as { markdown: string; staleBy: number };
     expect(body.markdown).toContain('What this app does');
@@ -102,7 +104,9 @@ describe('refreshArchitectureTool', () => {
     store.upsertSession(facts({}));
     const runner: ArchRunner = async () =>
       '## What this app does\nx\n## The main parts\nx\n' +
-      '## How the pieces work together\nx\n## Recent changes\n- did a thing';
+      '## How the pieces work together\nx\n' +
+      '## Architecture Diagram\n```mermaid\nflowchart TD\n  A --> B\n```\n' +
+      '## Recent changes\n- did a thing';
 
     const result = await refreshArchitectureTool(store, dataDir, 'C:\\work\\app', {}, runner);
     const body = textOf(result) as { status: string; message: string };
@@ -118,7 +122,9 @@ describe('refreshArchitectureTool', () => {
     const runner: ArchRunner = async (_prompt, opts) => {
       calls.push({ tools: opts.tools });
       return '## What this app does\nx\n## The main parts\nx\n' +
-        '## How the pieces work together\nx\n## Recent changes\n- did a thing';
+        '## How the pieces work together\nx\n' +
+        '## Architecture Diagram\n```mermaid\nflowchart TD\n  A --> B\n```\n' +
+        '## Recent changes\n- did a thing';
     };
     await refreshArchitectureTool(store, dataDir, 'C:\\work\\app', { full: true }, runner);
     expect(calls[0].tools).toBe(true);

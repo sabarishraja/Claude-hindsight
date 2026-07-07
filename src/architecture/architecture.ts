@@ -4,7 +4,7 @@ import { computeStaleBy } from './staleness.js';
 import { readArchitectureDoc, writeArchitectureDoc, type ArchitectureMeta } from './state.js';
 import {
   buildFullPrompt, buildIncrementalPrompt, isValidDoc, trimRecentChanges,
-  defaultRunClaude, type ArchRunner, type SessionSummary,
+  defaultRunClaude, hasHeading, type ArchRunner, type SessionSummary,
 } from './generate.js';
 
 export interface RefreshOptions {
@@ -40,7 +40,9 @@ export async function refreshArchitecture(
   const sessions = realSessions(allSessions);
   const existing = readArchitectureDoc(opts.dataDir, projectDir);
   const staleBy = computeStaleBy(sessions, existing?.meta.coveredThroughTs ?? null);
-  const doFull = opts.full === true || existing === null;
+  const doFull = opts.full === true
+    || existing === null
+    || !hasHeading(existing.markdown, 'architecture diagram');
 
   if (!doFull && staleBy === 0) {
     return { status: 'up-to-date', message: 'Architecture doc is already up to date.' };
