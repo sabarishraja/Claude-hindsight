@@ -6,6 +6,14 @@
   "bin": {
     "claude-hindsight": "dist/cli.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    ".claude-plugin",
+    ".mcp.json",
+    "hooks"
+  ],
   "engines": {
     "node": ">=20"
   },

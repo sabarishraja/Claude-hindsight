@@ -5,3 +5,4 @@ ui/dist/
 *.db
 docs/superpowers/
 .superpowers/
+.claude/
