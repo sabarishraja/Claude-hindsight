@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path';
 import { Store } from '../indexer/store.js';
 import { buildBriefing } from '../analyzer/briefing.js';
 import { updateLiveStats } from './liveSession.js';
-import { renderStatusline, type StatuslineView } from './render.js';
+import { renderStatusline, getContextLimit, type StatuslineView } from './render.js';
 import { getArchitectureView } from '../architecture/architecture.js';
 import type { PolishResult } from '../types.js';
 
@@ -53,7 +53,11 @@ export function runStatusline(stdinText: string, dataDir: string, now: () => Dat
     liveCommands: 0,
     sessionCount: 0,
     windowTokens: 0,
+    resetMinutesRemaining: null,
+    context: null,
   };
+
+  let latestReset: string | null = null;
 
   if (typeof data.transcript_path === 'string' && /^[A-Za-z0-9._-]+$/.test(data.session_id)) {
     const statePath = join(dataDir, 'statusline', `${data.session_id}.json`);
@@ -61,6 +65,10 @@ export function runStatusline(stdinText: string, dataDir: string, now: () => Dat
     view.liveFiles = live.files;
     view.liveCommands = live.commands;
     view.windowTokens += live.tokens;
+    latestReset = live.rateLimitResetAt;
+    if (live.contextTokens !== null) {
+      view.context = { used: live.contextTokens, limit: getContextLimit(view.modelName) };
+    }
   }
 
   const dbPath = join(dataDir, 'index.db');
@@ -70,6 +78,11 @@ export function runStatusline(stdinText: string, dataDir: string, now: () => Dat
     try {
       const cutoffIso = new Date(now().getTime() - TOKEN_WINDOW_MS).toISOString();
       view.windowTokens += store.getTokensSince(cutoffIso);
+
+      const indexedReset = store.getLatestRateLimitReset();
+      if (indexedReset !== null && (latestReset === null || indexedReset > latestReset)) {
+        latestReset = indexedReset;
+      }
 
       const cwd = data.workspace?.project_dir ?? data.workspace?.current_dir ?? process.cwd();
       const project = findProjectForCwd(store.listProjects(), cwd);
@@ -102,5 +115,10 @@ export function runStatusline(stdinText: string, dataDir: string, now: () => Dat
     }
   }
 
-  return renderStatusline(view, now());
+  const nowDate = now();
+  if (latestReset !== null && new Date(latestReset).getTime() > nowDate.getTime()) {
+    view.resetMinutesRemaining = Math.ceil((new Date(latestReset).getTime() - nowDate.getTime()) / 60_000);
+  }
+
+  return renderStatusline(view, nowDate);
 }

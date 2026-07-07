@@ -87,6 +87,18 @@ theoretically be counted once live and then again once indexed. All of these are
 practice and informational-only — not correctness issues worth engineering per-message windowing
 around.
 
+When Claude Code itself reports a real rate-limit hit (a `429` with a "resets HH:MMam/pm
+(Timezone)" message — verified against real transcript data, not predicted from your usage
+pattern), the token segment gains a countdown: `3.9K tok · 5h — resets in 1h 12m`. No hit
+recorded, or the recorded reset time has already passed → no countdown shown, ever — silence
+is preferred over a guess.
+
+A third row shows the current conversation's context-window fill against the model's context
+limit (200K by default — no local signal distinguishes the opt-in 1M-context beta from the
+default, so this may undercount for a session actually running with a larger window):
+`Context [██████░░░░] 168K/200K (large codebase loaded)`. Hidden entirely until the first
+assistant turn of the session.
+
 ```bash
 node dist/cli.js statusline --install            # wire into ~/.claude/settings.json
 node dist/cli.js statusline --install --project  # this project's .claude/settings.json instead

@@ -197,4 +197,67 @@ describe('runStatusline', () => {
     const row2 = strip(runStatusline(stdin, dataDir)).split('\n')[1];
     expect(row2).toContain('50 tok · 5h');
   });
+
+  it('surfaces a reset countdown when the most recent detected reset time is still in the future', () => {
+    const { dataDir, transcript } = setup();
+    const store = new Store(join(dataDir, 'index.db'));
+    store.upsertSession(facts({
+      sessionId: 'reset-hit', projectDir: 'proj', cwd: 'C:\\work\\app', goal: 'hit a limit',
+      lastTs: '2026-07-06T09:00:00Z', rateLimitResetAt: '2026-07-06T11:12:00Z',
+    }));
+    store.close();
+
+    const now = () => new Date('2026-07-06T10:00:00Z');
+    const row2 = strip(runStatusline(stdinFor(dataDir, transcript), dataDir, now)).split('\n')[1];
+    expect(row2).toContain('resets in 1h 12m');
+  });
+
+  it('does not show a reset countdown when the most recent detected reset time is already past', () => {
+    const { dataDir, transcript } = setup();
+    const store = new Store(join(dataDir, 'index.db'));
+    store.upsertSession(facts({
+      sessionId: 'old-reset', projectDir: 'proj', cwd: 'C:\\work\\app', goal: 'old limit hit',
+      lastTs: '2026-07-06T05:00:00Z', rateLimitResetAt: '2026-07-06T09:00:00Z',
+    }));
+    store.close();
+
+    const now = () => new Date('2026-07-06T10:00:00Z');
+    const row2 = strip(runStatusline(stdinFor(dataDir, transcript), dataDir, now)).split('\n')[1];
+    expect(row2).not.toContain('resets in');
+  });
+
+  it('renders a Context row from the live session\'s latest usage snapshot', () => {
+    const { dataDir } = setup();
+    const transcript = join(dataDir, 'ctx.jsonl');
+    writeFileSync(transcript, JSON.stringify({
+      type: 'assistant',
+      message: { content: [], usage: { input_tokens: 168_000, output_tokens: 50 } },
+    }) + '\n');
+    const stdin = JSON.stringify({
+      session_id: 'current', transcript_path: transcript,
+      workspace: { current_dir: 'C:\\work\\app', project_dir: 'C:\\work\\app' },
+      model: { display_name: 'Fable 5' }, cost: { total_cost_usd: 0.1 },
+    });
+    const out = strip(runStatusline(stdin, dataDir));
+    const rows = out.split('\n');
+    expect(rows).toHaveLength(3);
+    expect(rows[2]).toContain('Context');
+    expect(rows[2]).toContain('168K');
+    expect(rows[2]).toContain('200K');
+  });
+
+  it('omits the Context row when the live session has no assistant usage yet', () => {
+    const { dataDir } = setup();
+    const transcript = join(dataDir, 'ctx2.jsonl');
+    writeFileSync(transcript, JSON.stringify({
+      type: 'assistant',
+      message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'ls' } }] },
+    }) + '\n');
+    const stdin = JSON.stringify({
+      session_id: 'current', transcript_path: transcript,
+      workspace: { current_dir: 'C:\\work\\app', project_dir: 'C:\\work\\app' },
+    });
+    const out = strip(runStatusline(stdin, dataDir));
+    expect(out.split('\n')).toHaveLength(2);
+  });
 });
