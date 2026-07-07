@@ -77,9 +77,15 @@ session across *all* your projects whose activity falls in the trailing 5 hours 
 current session's live, still-growing count — mirroring the rolling window Claude subscription
 plans actually rate-limit on. There's no percentage or "remaining" figure: no local or offline
 source exists for your plan's actual quota, and fetching one would require a network call this
-tool deliberately never makes. If you manually re-index while a long session is still open, that
-session's tokens could theoretically be counted once live and then again once indexed — a rare,
-small, informational-only discrepancy, not a correctness issue worth engineering around.
+tool deliberately never makes. Two known approximations, honestly: indexed sessions are
+attributed to the window by when they *ended*, not per-message, so a session that ran long
+before ending just inside the window counts its whole total, and one that ended just outside the
+window is fully excluded even if most of its usage was inside it; the current session's live
+count is never windowed at all, so a session kept open past 5 hours keeps accumulating. And if
+you manually re-index while a long session is still open, that session's tokens could
+theoretically be counted once live and then again once indexed. All of these are rare or small in
+practice and informational-only — not correctness issues worth engineering per-message windowing
+around.
 
 ```bash
 node dist/cli.js statusline --install            # wire into ~/.claude/settings.json
