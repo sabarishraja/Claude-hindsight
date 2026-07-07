@@ -1,5 +1,59 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import mermaid from 'mermaid';
 import { fetchArchitecture, type ArchitectureView } from '../api';
+
+mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'strict' });
+
+let diagramCounter = 0;
+
+function MermaidDiagram({ code }: { code: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setFailed(false);
+    const id = `arch-diagram-${diagramCounter++}`;
+    mermaid.render(id, code)
+      .then(({ svg }) => {
+        if (!cancelled && containerRef.current) containerRef.current.innerHTML = svg;
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => { cancelled = true; };
+  }, [code]);
+
+  if (failed) {
+    return (
+      <div className="my-4 rounded-lg border border-zinc-700 bg-zinc-900/50 p-4">
+        <p className="mb-2 text-sm text-zinc-500">Diagram couldn&apos;t be rendered.</p>
+        <pre className="whitespace-pre-wrap font-mono text-xs text-zinc-400">{code}</pre>
+      </div>
+    );
+  }
+
+  return <div ref={containerRef} className="my-4" />;
+}
+
+const MERMAID_FENCE = /```mermaid\n([\s\S]*?)```/;
+
+function renderMarkdownWithDiagram(markdown: string) {
+  const match = markdown.match(MERMAID_FENCE);
+  if (!match || match.index === undefined) {
+    return <pre className="whitespace-pre-wrap font-sans text-sm text-zinc-200 leading-relaxed">{markdown}</pre>;
+  }
+  const before = markdown.slice(0, match.index);
+  const after = markdown.slice(match.index + match[0].length);
+  const code = match[1];
+  return (
+    <>
+      <pre className="whitespace-pre-wrap font-sans text-sm text-zinc-200 leading-relaxed">{before}</pre>
+      <MermaidDiagram code={code} />
+      <pre className="whitespace-pre-wrap font-sans text-sm text-zinc-200 leading-relaxed">{after}</pre>
+    </>
+  );
+}
 
 export default function Architecture({ projectDir }: { projectDir: string | null }) {
   const [view, setView] = useState<ArchitectureView | null>(null);
@@ -34,7 +88,7 @@ export default function Architecture({ projectDir }: { projectDir: string | null
           <code className="bg-zinc-900 rounded px-1.5 py-0.5">claude-hindsight architecture</code> to refresh.
         </div>
       )}
-      <pre className="whitespace-pre-wrap font-sans text-sm text-zinc-200 leading-relaxed">{view.markdown}</pre>
+      {renderMarkdownWithDiagram(view.markdown)}
     </main>
   );
 }
