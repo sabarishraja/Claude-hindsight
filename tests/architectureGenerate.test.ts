@@ -12,6 +12,7 @@ vi.mock('node:child_process', () => ({
 
 import {
   buildFullPrompt, buildIncrementalPrompt, isValidDoc, trimRecentChanges, defaultRunClaude,
+  hasHeading,
 } from '../src/architecture/generate.js';
 
 describe('buildFullPrompt', () => {
@@ -22,6 +23,23 @@ describe('buildFullPrompt', () => {
     expect(prompt).toContain('## How the pieces work together');
     expect(prompt).toContain('## Recent changes');
     expect(prompt).toContain('Read, Glob, and Grep');
+  });
+
+  it('pins the five required headings and instructs read-only exploration', () => {
+    const prompt = buildFullPrompt();
+    expect(prompt).toContain('## What this app does');
+    expect(prompt).toContain('## The main parts');
+    expect(prompt).toContain('## How the pieces work together');
+    expect(prompt).toContain('## Architecture Diagram');
+    expect(prompt).toContain('## Recent changes');
+    expect(prompt).toContain('Read, Glob, and Grep');
+  });
+
+  it('instructs a small conceptual mermaid flowchart, not a code-derived graph', () => {
+    const prompt = buildFullPrompt();
+    expect(prompt).toContain('```mermaid');
+    expect(prompt).toContain('flowchart');
+    expect(prompt).toContain('conceptual');
   });
 });
 
@@ -44,13 +62,20 @@ describe('buildIncrementalPrompt', () => {
     const prompt = buildIncrementalPrompt('doc', [], []);
     expect(prompt).toContain('(none)');
   });
+
+  it('instructs preserving the diagram section alongside the other three', () => {
+    const prompt = buildIncrementalPrompt('doc', [], []);
+    expect(prompt).toContain('Architecture Diagram');
+  });
 });
 
 describe('isValidDoc', () => {
-  it('accepts a doc with all four required headings', () => {
+  it('accepts a doc with all five required headings', () => {
     expect(isValidDoc(
       '## What this app does\nx\n## The main parts\nx\n' +
-      '## How the pieces work together\nx\n## Recent changes\nx',
+      '## How the pieces work together\nx\n' +
+      '## Architecture Diagram\n```mermaid\nflowchart TD\n  A --> B\n```\n' +
+      '## Recent changes\nx',
     )).toBe(true);
   });
 
@@ -64,6 +89,22 @@ describe('isValidDoc', () => {
       'of the app, discussing how the pieces work together and what this app does, ' +
       'but with no real headings anywhere.';
     expect(isValidDoc(docWithPhrasesOnly)).toBe(false);
+  });
+
+  it('rejects a doc with the first four headings but missing the diagram heading', () => {
+    expect(isValidDoc(
+      '## What this app does\nx\n## The main parts\nx\n' +
+      '## How the pieces work together\nx\n## Recent changes\nx',
+    )).toBe(false);
+  });
+
+  it('accepts a doc with all five required headings, including the diagram', () => {
+    expect(isValidDoc(
+      '## What this app does\nx\n## The main parts\nx\n' +
+      '## How the pieces work together\nx\n' +
+      '## Architecture Diagram\n```mermaid\nflowchart TD\n  A --> B\n```\n' +
+      '## Recent changes\nx',
+    )).toBe(true);
   });
 });
 
@@ -102,6 +143,18 @@ describe('defaultRunClaude', () => {
 
     const [command] = execMock.mock.calls[0];
     expect(command).not.toContain('--allowedTools');
+  });
+});
+
+describe('hasHeading', () => {
+  it('matches a heading case-insensitively regardless of surrounding content', () => {
+    expect(hasHeading('## Architecture Diagram\nsome text', 'architecture diagram')).toBe(true);
+    expect(hasHeading('## architecture diagram   \nx', 'Architecture Diagram')).toBe(true);
+  });
+
+  it('rejects prose mentioning the phrase without a real heading, and missing headings', () => {
+    expect(hasHeading('this talks about the architecture diagram but is not one', 'architecture diagram')).toBe(false);
+    expect(hasHeading('## Some other heading', 'architecture diagram')).toBe(false);
   });
 });
 

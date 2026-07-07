@@ -12,10 +12,11 @@ export function buildFullPrompt(): string {
     'not read code and relies entirely on Claude Code to make changes. Avoid jargon;',
     'explain concepts in plain language.',
     '',
-    'Use exactly these four top-level markdown headings, in this order:',
+    'Use exactly these five top-level markdown headings, in this order:',
     '## What this app does',
     '## The main parts',
     '## How the pieces work together',
+    '## Architecture Diagram',
     '## Recent changes',
     '',
     '"What this app does": two or three sentences on the purpose of the project.',
@@ -23,6 +24,15 @@ export function buildFullPrompt(): string {
     'does, roughly where it lives, and what it depends on.',
     '"How the pieces work together": describe the main workflows as a narrative',
     '(e.g. "when you open the dashboard, the server reads the index and...").',
+    '"Architecture Diagram": a small conceptual flowchart (roughly 6-12 nodes),',
+    'mirroring "The main parts" and "How the pieces work together" — not a literal',
+    'file/import graph. Write it as a fenced code block using plain Mermaid',
+    '`flowchart TD` (or `LR`) syntax only — no subgraphs, no custom styling or',
+    'classDef, to minimize the chance of a syntax error. Example shape:',
+    '```mermaid',
+    'flowchart TD',
+    '  A[Some part] --> B[Another part]',
+    '```',
     '"Recent changes": leave this section with a single placeholder bullet',
     '"- (no history yet)" — it will be filled in by later refreshes.',
     '',
@@ -44,7 +54,10 @@ export function buildIncrementalPrompt(
     'bullet to the top of "## Recent changes" — one plain-English sentence per session,',
     'newest first — describing what changed, based on the session summaries below (not',
     'file names). Keep at most 10 bullets in "## Recent changes", dropping the oldest.',
-    "Preserve the other three sections' structure and the exact heading text.",
+    'If the changes affect the system\'s overall shape, also update the Mermaid flowchart',
+    'in "## Architecture Diagram" to match; otherwise leave it as-is.',
+    "Preserve the other four sections' structure and the exact heading text, including",
+    '"## Architecture Diagram".',
     '',
     '--- Current document ---',
     previousDoc,
@@ -60,19 +73,19 @@ export function buildIncrementalPrompt(
 }
 
 const REQUIRED_HEADINGS = [
-  'what this app does', 'the main parts', 'how the pieces work together', 'recent changes',
+  'what this app does', 'the main parts', 'how the pieces work together',
+  'architecture diagram', 'recent changes',
 ];
+
+export function hasHeading(markdown: string, heading: string): boolean {
+  const lines = markdown.split('\n');
+  const headingRegex = new RegExp(`^##\\s+${heading}\\s*$`, 'i');
+  return lines.some((line) => headingRegex.test(line));
+}
 
 export function isValidDoc(markdown: string): boolean {
   if (!markdown || markdown.trim().length === 0) return false;
-  const lines = markdown.split('\n');
-  return REQUIRED_HEADINGS.every((heading) => {
-    return lines.some((line) => {
-      // Match lines that look like "## <heading text>" (case-insensitive, allowing trailing whitespace)
-      const headingRegex = new RegExp(`^##\\s+${heading}\\s*$`, 'i');
-      return headingRegex.test(line);
-    });
-  });
+  return REQUIRED_HEADINGS.every((heading) => hasHeading(markdown, heading));
 }
 
 const RECENT_HEADING = /^##\s+Recent changes\s*$/i;
