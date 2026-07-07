@@ -50,6 +50,7 @@ export function runStatusline(stdinText: string, dataDir: string): string {
     liveFiles: 0,
     liveCommands: 0,
     sessionCount: 0,
+    windowTokens: 0,
   };
 
   if (typeof data.transcript_path === 'string' && /^[A-Za-z0-9._-]+$/.test(data.session_id)) {

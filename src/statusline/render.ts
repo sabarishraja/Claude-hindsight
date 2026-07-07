@@ -15,10 +15,21 @@ export interface StatuslineView {
   liveFiles: number;
   liveCommands: number;
   sessionCount: number;
+  windowTokens: number;          // tokens used across all projects in the trailing 5 hours
   archStaleBy?: number;          // undefined/0 => no nudge; >0 => sessions behind
 }
 
 const MAX_WIDTH = 110; // keep rows on one line in typical terminals
+
+export function formatTokenCount(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 1_000_000) {
+    const k = n / 1000;
+    return (n < 10_000 ? k.toFixed(1) : Math.round(k).toString()) + 'K';
+  }
+  const m = n / 1_000_000;
+  return (n < 10_000_000 ? m.toFixed(1) : Math.round(m).toString()) + 'M';
+}
 
 export function renderStatusline(view: StatuslineView, now: Date = new Date()): string {
   const p = (code: string, t: string) => code + t + ANSI.reset;
@@ -47,6 +58,7 @@ export function renderStatusline(view: StatuslineView, now: Date = new Date()): 
   const segments: string[] = [p(ANSI.bold + ANSI.orange, '🕶 Hindsight')];
   if (view.modelName) segments.push(view.modelName);
   if (view.costUsd !== null) segments.push(`$${view.costUsd.toFixed(2)}`);
+  segments.push(`${formatTokenCount(view.windowTokens)} tok · 5h`);
   segments.push(`${view.liveFiles} files · ${view.liveCommands} cmds`);
   segments.push(p(ANSI.dim, `${view.sessionCount} session${view.sessionCount === 1 ? '' : 's'} indexed`));
 

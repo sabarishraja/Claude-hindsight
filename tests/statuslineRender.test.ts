@@ -1,12 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import { renderStatusline, type StatuslineView } from '../src/statusline/render.js';
+import { renderStatusline, formatTokenCount, type StatuslineView } from '../src/statusline/render.js';
 
 const strip = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
 
 const base: StatuslineView = {
   last: null, indexed: true, modelName: 'Fable 5', costUsd: 0.42,
-  liveFiles: 3, liveCommands: 12, sessionCount: 47,
+  liveFiles: 3, liveCommands: 12, sessionCount: 47, windowTokens: 342_000,
 };
+
+describe('formatTokenCount', () => {
+  it('formats representative magnitudes', () => {
+    expect(formatTokenCount(0)).toBe('0');
+    expect(formatTokenCount(999)).toBe('999');
+    expect(formatTokenCount(1500)).toBe('1.5K');
+    expect(formatTokenCount(342_000)).toBe('342K');
+    expect(formatTokenCount(1_234_567)).toBe('1.2M');
+  });
+});
 
 describe('renderStatusline', () => {
   it('renders two rows with last-session story and live segments', () => {
@@ -23,6 +33,7 @@ describe('renderStatusline', () => {
     expect(row2).toContain('🕶 Hindsight');
     expect(row2).toContain('Fable 5');
     expect(row2).toContain('$0.42');
+    expect(row2).toContain('342K tok · 5h');
     expect(row2).toContain('3 files · 12 cmds');
     expect(row2).toContain('47 sessions indexed');
     expect(out.split('\n')).toHaveLength(2);
@@ -45,9 +56,9 @@ describe('renderStatusline', () => {
       .toContain('run claude-hindsight to index');
   });
 
-  it('omits model/cost segments when absent and truncates long goals', () => {
+  it('omits model/cost segments when absent, still shows the token segment, and truncates long goals', () => {
     const view: StatuslineView = {
-      ...base, modelName: null, costUsd: null,
+      ...base, modelName: null, costUsd: null, windowTokens: 0,
       last: { when: '2026-07-06T08:00:00Z', ending: 'clean', goal: 'x'.repeat(300), pendingQuestion: false },
     };
     const out = strip(renderStatusline(view));
@@ -55,6 +66,7 @@ describe('renderStatusline', () => {
     expect(row1.length).toBeLessThanOrEqual(120);
     expect(row2).not.toContain('$');
     expect(row2).not.toContain('Fable');
+    expect(row2).toContain('0 tok · 5h');
   });
 
   it('appends an arch-staleness segment to row 1 when set and positive', () => {
