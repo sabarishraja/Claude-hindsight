@@ -246,6 +246,39 @@ describe('runStatusline', () => {
     expect(rows[2]).toContain('200K');
   });
 
+  it('shows both the reset countdown and the Context row together when both are live in the same session', () => {
+    const { dataDir } = setup();
+    const transcript = join(dataDir, 'combined.jsonl');
+    writeFileSync(transcript, [
+      JSON.stringify({
+        type: 'assistant', timestamp: '2026-07-06T09:48:00.000Z',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: "You've hit your session limit · resets 11:12am (UTC)" }],
+        },
+        error: 'rate_limit', isApiErrorMessage: true,
+      }),
+      JSON.stringify({
+        type: 'assistant',
+        message: { content: [], usage: { input_tokens: 168_000, output_tokens: 50 } },
+      }),
+    ].join('\n') + '\n');
+
+    const stdin = JSON.stringify({
+      session_id: 'current', transcript_path: transcript,
+      workspace: { current_dir: 'C:\\work\\app', project_dir: 'C:\\work\\app' },
+      model: { display_name: 'Fable 5' }, cost: { total_cost_usd: 0.1 },
+    });
+
+    const now = () => new Date('2026-07-06T10:00:00Z');
+    const out = strip(runStatusline(stdin, dataDir, now));
+    const rows = out.split('\n');
+    expect(rows).toHaveLength(3);
+    expect(rows[1]).toContain('resets in 1h 12m');
+    expect(rows[2]).toContain('Context');
+    expect(rows[2]).toContain('168K');
+  });
+
   it('omits the Context row when the live session has no assistant usage yet', () => {
     const { dataDir } = setup();
     const transcript = join(dataDir, 'ctx2.jsonl');
