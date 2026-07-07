@@ -72,6 +72,15 @@ your previous session's story (ending badge, goal, and a ⚠ marker if it ended 
 an unanswered question); row 2 shows the current model, session cost, live
 files-edited/commands-run counts, and how many sessions are indexed.
 
+Row 2 also shows a rolling **5-hour token usage** total (`tok · 5h`), combining every indexed
+session across *all* your projects whose activity falls in the trailing 5 hours with the
+current session's live, still-growing count — mirroring the rolling window Claude subscription
+plans actually rate-limit on. There's no percentage or "remaining" figure: no local or offline
+source exists for your plan's actual quota, and fetching one would require a network call this
+tool deliberately never makes. If you manually re-index while a long session is still open, that
+session's tokens could theoretically be counted once live and then again once indexed — a rare,
+small, informational-only discrepancy, not a correctness issue worth engineering around.
+
 ```bash
 node dist/cli.js statusline --install            # wire into ~/.claude/settings.json
 node dist/cli.js statusline --install --project  # this project's .claude/settings.json instead

@@ -21,6 +21,8 @@ export const USAGE =
 
 type ProjectRow = { projectDir: string; cwd: string | null; sessionCount: number; lastTs: string | null };
 
+const TOKEN_WINDOW_MS = 5 * 60 * 60 * 1000;
+
 // Same matching rules as the terminal briefing in cli.ts: exact cwd match
 // first, then "cwd is inside the project directory". Windows-insensitive.
 export function findProjectForCwd(projects: ProjectRow[], cwd: string): ProjectRow | undefined {
@@ -33,7 +35,7 @@ export function findProjectForCwd(projects: ProjectRow[], cwd: string): ProjectR
   );
 }
 
-export function runStatusline(stdinText: string, dataDir: string): string {
+export function runStatusline(stdinText: string, dataDir: string, now: () => Date = () => new Date()): string {
   let data: StdinData;
   try {
     data = JSON.parse(stdinText) as StdinData;
@@ -58,6 +60,7 @@ export function runStatusline(stdinText: string, dataDir: string): string {
     const live = updateLiveStats(statePath, data.transcript_path);
     view.liveFiles = live.files;
     view.liveCommands = live.commands;
+    view.windowTokens += live.tokens;
   }
 
   const dbPath = join(dataDir, 'index.db');
@@ -65,6 +68,9 @@ export function runStatusline(stdinText: string, dataDir: string): string {
     view.indexed = true;
     const store = new Store(dbPath, { readonly: true });
     try {
+      const cutoffIso = new Date(now().getTime() - TOKEN_WINDOW_MS).toISOString();
+      view.windowTokens += store.getTokensSince(cutoffIso);
+
       const cwd = data.workspace?.project_dir ?? data.workspace?.current_dir ?? process.cwd();
       const project = findProjectForCwd(store.listProjects(), cwd);
       if (project) {
@@ -96,5 +102,5 @@ export function runStatusline(stdinText: string, dataDir: string): string {
     }
   }
 
-  return renderStatusline(view);
+  return renderStatusline(view, now());
 }
