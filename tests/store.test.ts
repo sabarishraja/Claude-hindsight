@@ -158,6 +158,70 @@ describe('Store', () => {
     });
   });
 
+  describe('schema migration for pre-existing databases', () => {
+    // Regression test for a real production bug: `CREATE TABLE IF NOT EXISTS` is a no-op on a
+    // table that already exists, so bumping INDEX_VERSION alone never added the new
+    // rateLimitResetAt column to any database that existed before it — every write/read
+    // referencing that column by name threw "no such column: rateLimitResetAt" on real user
+    // databases, even though every test here used a fresh (correctly-shaped) database and
+    // never caught it.
+    function createPreExistingDb(dbPath: string): void {
+      const raw = new Database(dbPath);
+      raw.exec(`
+        CREATE TABLE sessions (
+          sessionId TEXT PRIMARY KEY, projectDir TEXT NOT NULL, cwd TEXT, goal TEXT,
+          firstTs TEXT, lastTs TEXT, messageCount INTEGER, inputTokens INTEGER, outputTokens INTEGER,
+          filesEdited TEXT, commandsRun TEXT, skillsInvoked TEXT,
+          errorCount INTEGER, ending TEXT, lastUserText TEXT, lastAssistantText TEXT, skippedLines INTEGER
+        );
+        CREATE TABLE files (path TEXT PRIMARY KEY, mtimeMs REAL, size INTEGER);
+        CREATE TABLE polish (sessionId TEXT PRIMARY KEY, goal TEXT, outcome TEXT);
+      `);
+      raw.pragma('user_version = 2'); // the last version before rateLimitResetAt existed
+      raw.prepare(`
+        INSERT INTO sessions
+        (sessionId, projectDir, cwd, goal, firstTs, lastTs, messageCount, inputTokens, outputTokens,
+         filesEdited, commandsRun, skillsInvoked, errorCount, ending, lastUserText, lastAssistantText, skippedLines)
+        VALUES ('old-session', 'proj-a', 'C:\\proj', 'a goal', '2026-07-01T10:00:00Z', '2026-07-01T11:00:00Z',
+         4, 1000, 200, '[]', '[]', '[]', 0, 'clean', null, null, 0)
+      `).run();
+      raw.close();
+    }
+
+    it('self-heals a pre-existing on-disk database missing the rateLimitResetAt column', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'hindsight-store-'));
+      const dbPath = join(dir, 'index.db');
+      try {
+        createPreExistingDb(dbPath);
+
+        const store = new Store(dbPath);
+        // The old row survives the migration, and new writes/reads referencing the
+        // new column both work without throwing.
+        expect(store.getSessions('proj-a')).toHaveLength(1);
+        store.upsertSession(facts({ sessionId: 'new-session', rateLimitResetAt: '2026-07-05T10:00:00Z' }));
+        expect(store.getLatestRateLimitReset()).toBe('2026-07-05T10:00:00Z');
+        store.close();
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('degrades to null, not a thrown error, when a readonly Store opens a pre-existing database', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'hindsight-store-'));
+      const dbPath = join(dir, 'index.db');
+      try {
+        createPreExistingDb(dbPath);
+        // A readonly Store (the statusline's path) can never run the migration itself.
+        const readonlyStore = new Store(dbPath, { readonly: true });
+        expect(() => readonlyStore.getLatestRateLimitReset()).not.toThrow();
+        expect(readonlyStore.getLatestRateLimitReset()).toBe(null);
+        readonlyStore.close();
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+  });
+
   describe('getLatestRateLimitReset', () => {
     it('returns the max reset time across all sessions', () => {
       const store = new Store(':memory:');

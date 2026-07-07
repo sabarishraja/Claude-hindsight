@@ -27,6 +27,17 @@ interface SessionRow {
   rateLimitResetAt: string | null;
 }
 
+// `CREATE TABLE IF NOT EXISTS` is a no-op on a table that already exists — it never adds new
+// columns to an existing on-disk database. Older databases (from before rateLimitResetAt was
+// added) need an explicit, idempotent ALTER TABLE to catch up; this self-heals regardless of
+// what the user_version pragma says, so it's safe even if a version bump was ever missed.
+function ensureRateLimitColumn(db: Database.Database): void {
+  const cols = db.prepare('PRAGMA table_info(sessions)').all() as { name: string }[];
+  if (!cols.some((c) => c.name === 'rateLimitResetAt')) {
+    db.exec('ALTER TABLE sessions ADD COLUMN rateLimitResetAt TEXT');
+  }
+}
+
 function rowToFacts(r: SessionRow): SessionFacts {
   return {
     ...r,
@@ -48,6 +59,7 @@ export class Store {
     this.db = new Database(dbPath);
     this.db.pragma('journal_mode = WAL');
     this.db.exec(SCHEMA);
+    ensureRateLimitColumn(this.db);
     const version = this.db.pragma('user_version', { simple: true }) as number;
     if (version !== INDEX_VERSION) {
       this.db.exec('DELETE FROM files');
@@ -121,10 +133,18 @@ export class Store {
   }
 
   getLatestRateLimitReset(): string | null {
-    const row = this.db.prepare(
-      'SELECT MAX(rateLimitResetAt) AS latest FROM sessions WHERE rateLimitResetAt IS NOT NULL',
-    ).get() as { latest: string | null };
-    return row.latest;
+    // A readonly Store (the statusline's path) can never run ensureRateLimitColumn — it opens
+    // the file as-is. On an older on-disk database that predates this column, querying it by
+    // name throws; degrade to "no reset detected" rather than let that surface as an error,
+    // matching every other read-only surface's calm-on-missing-data contract.
+    try {
+      const row = this.db.prepare(
+        'SELECT MAX(rateLimitResetAt) AS latest FROM sessions WHERE rateLimitResetAt IS NOT NULL',
+      ).get() as { latest: string | null };
+      return row.latest;
+    } catch {
+      return null;
+    }
   }
 
   close(): void { this.db.close(); }
