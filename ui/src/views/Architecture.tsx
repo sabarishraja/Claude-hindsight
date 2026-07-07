@@ -1,10 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import mermaid from 'mermaid';
 import { fetchArchitecture, type ArchitectureView } from '../api';
 
-mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'strict' });
-
 let diagramCounter = 0;
+let mermaidInitialized = false;
+
+async function loadMermaid() {
+  const { default: mermaid } = await import('mermaid');
+  if (!mermaidInitialized) {
+    mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'strict' });
+    mermaidInitialized = true;
+  }
+  return mermaid;
+}
 
 function MermaidDiagram({ code }: { code: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -17,8 +24,8 @@ function MermaidDiagram({ code }: { code: string }) {
     // Validate first: mermaid.render() injects a visible error graphic into the DOM
     // on invalid syntax (it doesn't clean up its offscreen render container on failure),
     // so we must never call it with input that hasn't already parsed successfully.
-    mermaid.parse(code)
-      .then(() => mermaid.render(id, code))
+    loadMermaid()
+      .then((mermaid) => mermaid.parse(code).then(() => mermaid.render(id, code)))
       .then(({ svg }) => {
         if (!cancelled && containerRef.current) containerRef.current.innerHTML = svg;
       })
