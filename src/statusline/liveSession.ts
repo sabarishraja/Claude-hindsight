@@ -2,25 +2,28 @@ import { readFileSync, statSync, openSync, readSync, closeSync, mkdirSync, write
 import { dirname } from 'node:path';
 import { parseLines } from '../indexer/parseLines.js';
 
-export interface LiveStats { files: number; commands: number; }
+export interface LiveStats { files: number; commands: number; tokens: number; }
 
-interface LiveState { bytesRead: number; filesEdited: string[]; commandCount: number; }
+interface LiveState { bytesRead: number; filesEdited: string[]; commandCount: number; tokens: number; }
 
-const FRESH: LiveState = { bytesRead: 0, filesEdited: [], commandCount: 0 };
+const FRESH: LiveState = { bytesRead: 0, filesEdited: [], commandCount: 0, tokens: 0 };
 
 function loadState(statePath: string): LiveState {
   try {
     const s = JSON.parse(readFileSync(statePath, 'utf8')) as LiveState;
     if (typeof s.bytesRead === 'number' && Array.isArray(s.filesEdited) && typeof s.commandCount === 'number') {
-      return s;
+      // A state file written before token tracking shipped won't have `tokens` yet;
+      // treat that as 0 rather than invalidating the whole cached tail.
+      return { ...s, tokens: typeof s.tokens === 'number' ? s.tokens : 0 };
     }
   } catch { /* missing or corrupt: start fresh */ }
   return { ...FRESH, filesEdited: [] };
 }
 
 // Reads only the bytes appended since the last call, parses complete lines,
-// and accumulates Edit/Write/NotebookEdit file paths and Bash/PowerShell
-// command counts in a state file keyed to the session.
+// and accumulates Edit/Write/NotebookEdit file paths, Bash/PowerShell command
+// counts, and token usage (from assistant `usage` blocks) in a state file
+// keyed to the session.
 export function updateLiveStats(statePath: string, transcriptPath: string): LiveStats {
   let state = loadState(statePath);
 
@@ -32,7 +35,7 @@ export function updateLiveStats(statePath: string, transcriptPath: string): Live
     state = { ...FRESH, filesEdited: [] };
     mkdirSync(dirname(statePath), { recursive: true });
     writeFileSync(statePath, JSON.stringify(state));
-    return { files: 0, commands: 0 };
+    return { files: 0, commands: 0, tokens: 0 };
   }
   if (size < state.bytesRead) state = { ...FRESH, filesEdited: [] }; // rotated or truncated
 
@@ -53,8 +56,15 @@ export function updateLiveStats(statePath: string, transcriptPath: string): Live
       const files = new Set(state.filesEdited);
       for (const rec of parseLines(complete).records) {
         if (rec['type'] !== 'assistant') continue;
-        const message = rec['message'] as { content?: unknown } | undefined;
-        if (!message || !Array.isArray(message.content)) continue;
+        const message = rec['message'] as { content?: unknown; usage?: Record<string, unknown> } | undefined;
+        if (!message) continue;
+        if (message.usage) {
+          for (const k of ['input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens']) {
+            if (typeof message.usage[k] === 'number') state.tokens += message.usage[k] as number;
+          }
+          if (typeof message.usage['output_tokens'] === 'number') state.tokens += message.usage['output_tokens'] as number;
+        }
+        if (!Array.isArray(message.content)) continue;
         for (const b of message.content as Record<string, unknown>[]) {
           if (!b || typeof b !== 'object' || b['type'] !== 'tool_use') continue;
           const name = b['name'];
@@ -72,5 +82,5 @@ export function updateLiveStats(statePath: string, transcriptPath: string): Live
     }
   }
 
-  return { files: state.filesEdited.length, commands: state.commandCount };
+  return { files: state.filesEdited.length, commands: state.commandCount, tokens: state.tokens };
 }
