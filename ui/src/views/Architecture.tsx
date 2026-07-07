@@ -14,7 +14,11 @@ function MermaidDiagram({ code }: { code: string }) {
     let cancelled = false;
     setFailed(false);
     const id = `arch-diagram-${diagramCounter++}`;
-    mermaid.render(id, code)
+    // Validate first: mermaid.render() injects a visible error graphic into the DOM
+    // on invalid syntax (it doesn't clean up its offscreen render container on failure),
+    // so we must never call it with input that hasn't already parsed successfully.
+    mermaid.parse(code)
+      .then(() => mermaid.render(id, code))
       .then(({ svg }) => {
         if (!cancelled && containerRef.current) containerRef.current.innerHTML = svg;
       })
