@@ -8,6 +8,11 @@
       "name": "claude-hindsight",
       "source": "./",
       "description": "Hindsight for your Claude Code history — live briefing, architecture, and CLAUDE.md audit tools via MCP, plus a SessionStart context hook. 100% local."
+    },
+    {
+      "name": "oversight",
+      "source": { "source": "github", "repo": "sabarishraja/Claude-oversight" },
+      "description": "Verifies agent completion claims (tests/build/files) at the Stop hook and blocks false 'done' handoffs. Companion to Hindsight."
     }
   ]
 }
