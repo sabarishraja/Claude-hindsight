@@ -7,6 +7,28 @@ database, and shows you where you left off: as a boxed briefing right in your te
 full CLAUDE.md instruction audit. It also plugs directly into Claude Code itself via a
 statusline and a `SessionStart` hook, so you don't have to run a separate command to see it.
 
+## The suite
+
+Claude-Hindsight is half of an observability suite for Claude Code — *remember what
+happened, verify what's claimed*:
+
+- **Hindsight** (this repo) — session memory: briefings, a living architecture doc,
+  CLAUDE.md audit, and a statusline. *Remembers what your sessions did.*
+- **[Oversight](https://github.com/sabarishraja/Claude-oversight)** — handoff
+  verification: re-runs tests/builds and checks files/git at the Stop hook, and blocks
+  false "done" claims. *Verifies what they claim.*
+
+Both install from this repo's marketplace:
+
+```
+/plugin marketplace add sabarishraja/Claude-hindsight
+/plugin install claude-hindsight
+/plugin install oversight
+```
+
+When Oversight is active in a project, Hindsight's statusline shows its verification
+tally for the current session — e.g. `🕵 3✓ 1✗`.
+
 ## The three dashboard views
 
 **Project Briefing** — a per-project timeline of sessions: extracted goal (from your first
