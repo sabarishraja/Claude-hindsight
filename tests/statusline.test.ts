@@ -150,54 +150,6 @@ describe('runStatusline', () => {
     expect(row1).toContain('arch doc 1 session behind');
   });
 
-  it('combines indexed cross-project tokens (within 5h) with live transcript tokens', () => {
-    const dataDir = mkdtempSync(join(tmpdir(), 'hindsight-sl-'));
-    const store = new Store(join(dataDir, 'index.db'));
-    store.upsertSession(facts({
-      sessionId: 'prev', projectDir: 'proj', cwd: 'C:\\work\\app', goal: 'refactor the indexer',
-      lastTs: '2026-07-06T09:30:00Z', inputTokens: 1000, outputTokens: 500, // within 5h of 'now' below
-    }));
-    store.upsertSession(facts({
-      sessionId: 'too-old', projectDir: 'proj', cwd: 'C:\\work\\app', goal: 'ancient session',
-      lastTs: '2026-07-06T01:00:00Z', inputTokens: 99999, outputTokens: 99999, // outside the window
-    }));
-    store.upsertSession(facts({
-      sessionId: 'other-project', projectDir: 'proj-b', cwd: 'C:\\work\\other', goal: 'unrelated project',
-      lastTs: '2026-07-06T09:45:00Z', inputTokens: 2000, outputTokens: 300, // different project, still within window
-    }));
-    store.close();
-
-    const transcript = join(dataDir, 'live.jsonl');
-    writeFileSync(transcript, JSON.stringify({
-      type: 'assistant',
-      message: { content: [], usage: { input_tokens: 50, output_tokens: 50 } },
-    }) + '\n');
-
-    const stdin = JSON.stringify({
-      session_id: 'current', transcript_path: transcript,
-      workspace: { current_dir: 'C:\\work\\app', project_dir: 'C:\\work\\app' },
-      model: { display_name: 'Fable 5' }, cost: { total_cost_usd: 0.1 },
-    });
-
-    const now = () => new Date('2026-07-06T10:00:00Z');
-    const row2 = strip(runStatusline(stdin, dataDir, now)).split('\n')[1];
-    // prev (1500) + other-project (2300) + live (100) = 3900; too-old excluded.
-    expect(row2).toContain('3.9K tok · 5h');
-  });
-
-  it('shows only live tokens when there is no index yet', () => {
-    const dataDir = mkdtempSync(join(tmpdir(), 'hindsight-sl-'));
-    mkdirSync(dataDir, { recursive: true });
-    const transcript = join(dataDir, 'live.jsonl');
-    writeFileSync(transcript, JSON.stringify({
-      type: 'assistant',
-      message: { content: [], usage: { input_tokens: 40, output_tokens: 10 } },
-    }) + '\n');
-    const stdin = JSON.stringify({ session_id: 's1', transcript_path: transcript });
-    const row2 = strip(runStatusline(stdin, dataDir)).split('\n')[1];
-    expect(row2).toContain('50 tok · 5h');
-  });
-
   it('surfaces a reset countdown when the most recent detected reset time is still in the future', () => {
     const { dataDir, transcript } = setup();
     const store = new Store(join(dataDir, 'index.db'));

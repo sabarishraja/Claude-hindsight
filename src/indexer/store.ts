@@ -96,13 +96,6 @@ export class Store {
     return rows.map(rowToFacts);
   }
 
-  getTokensSince(cutoffIso: string): number {
-    const row = this.db.prepare(
-      'SELECT COALESCE(SUM(inputTokens + outputTokens), 0) AS total FROM sessions WHERE lastTs >= ?',
-    ).get(cutoffIso) as { total: number };
-    return row.total;
-  }
-
   listProjects(): { projectDir: string; cwd: string | null; sessionCount: number; lastTs: string | null }[] {
     return this.db.prepare(`
       SELECT projectDir, MAX(cwd) AS cwd, COUNT(*) AS sessionCount, MAX(lastTs) AS lastTs

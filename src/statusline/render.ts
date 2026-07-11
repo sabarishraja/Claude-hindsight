@@ -15,7 +15,6 @@ export interface StatuslineView {
   liveFiles: number;
   liveCommands: number;
   sessionCount: number;
-  windowTokens: number;                  // tokens used across all projects in the trailing 5 hours
   resetMinutesRemaining: number | null;  // null => no real, still-future reset time detected
   context: { used: number; limit: number } | null; // null => no assistant turn yet this session
   archStaleBy?: number;          // undefined/0 => no nudge; >0 => sessions behind
@@ -98,9 +97,7 @@ export function renderStatusline(view: StatuslineView, now: Date = new Date()): 
   const segments: string[] = [p(ANSI.bold + ANSI.orange, '🕶 Hindsight')];
   if (view.modelName) segments.push(view.modelName);
   if (view.costUsd !== null) segments.push(`$${view.costUsd.toFixed(2)}`);
-  const resetSuffix = view.resetMinutesRemaining !== null
-    ? ` — ${formatResetCountdown(view.resetMinutesRemaining)}` : '';
-  segments.push(`${formatTokenCount(view.windowTokens)} tok · 5h${resetSuffix}`);
+  if (view.resetMinutesRemaining !== null) segments.push(formatResetCountdown(view.resetMinutesRemaining));
   segments.push(`${view.liveFiles} files · ${view.liveCommands} cmds`);
   segments.push(p(ANSI.dim, `${view.sessionCount} session${view.sessionCount === 1 ? '' : 's'} indexed`));
 

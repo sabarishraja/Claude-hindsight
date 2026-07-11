@@ -113,51 +113,6 @@ describe('Store', () => {
     store.close();
   });
 
-  describe('getTokensSince', () => {
-    it('sums tokens across all projects with lastTs at or after the cutoff', () => {
-      const store = new Store(':memory:');
-      store.upsertSession(facts({
-        sessionId: 'a-old', projectDir: 'proj-a', lastTs: '2026-07-01T05:00:00Z',
-        inputTokens: 1000, outputTokens: 100,
-      }));
-      store.upsertSession(facts({
-        sessionId: 'a-new', projectDir: 'proj-a', lastTs: '2026-07-01T10:00:00Z',
-        inputTokens: 2000, outputTokens: 200,
-      }));
-      store.upsertSession(facts({
-        sessionId: 'b-new', projectDir: 'proj-b', lastTs: '2026-07-01T11:00:00Z',
-        inputTokens: 3000, outputTokens: 300,
-      }));
-      // a-old is before the cutoff and excluded; a-new and b-new (different projects) are included.
-      expect(store.getTokensSince('2026-07-01T09:00:00Z')).toBe(2000 + 200 + 3000 + 300);
-      store.close();
-    });
-
-    it('includes a session exactly at the cutoff (inclusive boundary)', () => {
-      const store = new Store(':memory:');
-      store.upsertSession(facts({
-        sessionId: 'boundary', lastTs: '2026-07-01T09:00:00Z', inputTokens: 500, outputTokens: 50,
-      }));
-      expect(store.getTokensSince('2026-07-01T09:00:00Z')).toBe(550);
-      store.close();
-    });
-
-    it('excludes sessions with a null lastTs', () => {
-      const store = new Store(':memory:');
-      store.upsertSession(facts({
-        sessionId: 'null-ts', lastTs: null, inputTokens: 9999, outputTokens: 9999,
-      }));
-      expect(store.getTokensSince('2026-01-01T00:00:00Z')).toBe(0);
-      store.close();
-    });
-
-    it('returns 0 when there are no sessions at all', () => {
-      const store = new Store(':memory:');
-      expect(store.getTokensSince('2026-01-01T00:00:00Z')).toBe(0);
-      store.close();
-    });
-  });
-
   describe('schema migration for pre-existing databases', () => {
     // Regression test for a real production bug: `CREATE TABLE IF NOT EXISTS` is a no-op on a
     // table that already exists, so bumping INDEX_VERSION alone never added the new

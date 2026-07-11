@@ -8,7 +8,7 @@ const strip = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
 
 const base: StatuslineView = {
   last: null, indexed: true, modelName: 'Fable 5', costUsd: 0.42,
-  liveFiles: 3, liveCommands: 12, sessionCount: 47, windowTokens: 342_000,
+  liveFiles: 3, liveCommands: 12, sessionCount: 47,
   resetMinutesRemaining: null, context: null,
 };
 
@@ -78,16 +78,15 @@ describe('renderStatusline', () => {
     expect(rows[1]).toContain('🕶 Hindsight');
     expect(rows[1]).toContain('Fable 5');
     expect(rows[1]).toContain('$0.42');
-    expect(rows[1]).toContain('342K tok · 5h');
     expect(rows[1]).not.toContain('resets in');
     expect(rows[1]).toContain('3 files · 12 cmds');
     expect(rows[1]).toContain('47 sessions indexed');
   });
 
-  it('appends a reset countdown to the token segment when resetMinutesRemaining is set', () => {
+  it('adds a reset countdown segment when resetMinutesRemaining is set', () => {
     const view: StatuslineView = { ...base, resetMinutesRemaining: 72 };
     const row2 = strip(renderStatusline(view)).split('\n')[1];
-    expect(row2).toContain('342K tok · 5h — resets in 1h 12m');
+    expect(row2).toContain('resets in 1h 12m');
   });
 
   it('adds a third Context row when context is set, with bar/numbers/suffix', () => {
@@ -124,9 +123,9 @@ describe('renderStatusline', () => {
       .toContain('run claude-hindsight to index');
   });
 
-  it('omits model/cost segments when absent, still shows the token segment, and truncates long goals', () => {
+  it('omits model/cost segments when absent, and truncates long goals', () => {
     const view: StatuslineView = {
-      ...base, modelName: null, costUsd: null, windowTokens: 0,
+      ...base, modelName: null, costUsd: null,
       last: { when: '2026-07-06T08:00:00Z', ending: 'clean', goal: 'x'.repeat(300), pendingQuestion: false },
     };
     const out = strip(renderStatusline(view));
@@ -134,7 +133,6 @@ describe('renderStatusline', () => {
     expect(row1.length).toBeLessThanOrEqual(120);
     expect(row2).not.toContain('$');
     expect(row2).not.toContain('Fable');
-    expect(row2).toContain('0 tok · 5h');
   });
 
   it('appends an arch-staleness segment to row 1 when set and positive', () => {

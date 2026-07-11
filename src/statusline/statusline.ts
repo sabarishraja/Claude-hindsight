@@ -21,8 +21,6 @@ export const USAGE =
 
 type ProjectRow = { projectDir: string; cwd: string | null; sessionCount: number; lastTs: string | null };
 
-const TOKEN_WINDOW_MS = 5 * 60 * 60 * 1000;
-
 // Same matching rules as the terminal briefing in cli.ts: exact cwd match
 // first, then "cwd is inside the project directory". Windows-insensitive.
 export function findProjectForCwd(projects: ProjectRow[], cwd: string): ProjectRow | undefined {
@@ -52,7 +50,6 @@ export function runStatusline(stdinText: string, dataDir: string, now: () => Dat
     liveFiles: 0,
     liveCommands: 0,
     sessionCount: 0,
-    windowTokens: 0,
     resetMinutesRemaining: null,
     context: null,
   };
@@ -64,7 +61,6 @@ export function runStatusline(stdinText: string, dataDir: string, now: () => Dat
     const live = updateLiveStats(statePath, data.transcript_path);
     view.liveFiles = live.files;
     view.liveCommands = live.commands;
-    view.windowTokens += live.tokens;
     latestReset = live.rateLimitResetAt;
     if (live.contextTokens !== null) {
       view.context = { used: live.contextTokens, limit: getContextLimit(view.modelName) };
@@ -76,9 +72,6 @@ export function runStatusline(stdinText: string, dataDir: string, now: () => Dat
     view.indexed = true;
     const store = new Store(dbPath, { readonly: true });
     try {
-      const cutoffIso = new Date(now().getTime() - TOKEN_WINDOW_MS).toISOString();
-      view.windowTokens += store.getTokensSince(cutoffIso);
-
       const indexedReset = store.getLatestRateLimitReset();
       if (indexedReset !== null && (latestReset === null || indexedReset > latestReset)) {
         latestReset = indexedReset;

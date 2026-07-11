@@ -4,17 +4,17 @@ import { parseLines } from '../indexer/parseLines.js';
 import { extractRateLimitReset } from '../analyzer/rateLimit.js';
 
 export interface LiveStats {
-  files: number; commands: number; tokens: number;
+  files: number; commands: number;
   rateLimitResetAt: string | null; contextTokens: number | null;
 }
 
 interface LiveState {
-  bytesRead: number; filesEdited: string[]; commandCount: number; tokens: number;
+  bytesRead: number; filesEdited: string[]; commandCount: number;
   rateLimitResetAt: string | null; contextTokens: number | null;
 }
 
 const FRESH: LiveState = {
-  bytesRead: 0, filesEdited: [], commandCount: 0, tokens: 0,
+  bytesRead: 0, filesEdited: [], commandCount: 0,
   rateLimitResetAt: null, contextTokens: null,
 };
 
@@ -26,7 +26,6 @@ function loadState(statePath: string): LiveState {
       // treat that as their null/0 defaults rather than invalidating the whole cached tail.
       return {
         ...s,
-        tokens: typeof s.tokens === 'number' ? s.tokens : 0,
         rateLimitResetAt: typeof s.rateLimitResetAt === 'string' ? s.rateLimitResetAt : null,
         contextTokens: typeof s.contextTokens === 'number' ? s.contextTokens : null,
       };
@@ -36,7 +35,7 @@ function loadState(statePath: string): LiveState {
 }
 
 // Reads only the bytes appended since the last call, parses complete lines, and accumulates
-// Edit/Write/NotebookEdit file paths, Bash/PowerShell command counts, token usage, the latest
+// Edit/Write/NotebookEdit file paths, Bash/PowerShell command counts, the latest
 // rate-limit reset time, and the latest turn's context-window snapshot in a state file keyed
 // to the session.
 export function updateLiveStats(statePath: string, transcriptPath: string): LiveStats {
@@ -50,7 +49,7 @@ export function updateLiveStats(statePath: string, transcriptPath: string): Live
     state = { ...FRESH, filesEdited: [] };
     mkdirSync(dirname(statePath), { recursive: true });
     writeFileSync(statePath, JSON.stringify(state));
-    return { files: 0, commands: 0, tokens: 0, rateLimitResetAt: null, contextTokens: null };
+    return { files: 0, commands: 0, rateLimitResetAt: null, contextTokens: null };
   }
   if (size < state.bytesRead) state = { ...FRESH, filesEdited: [] }; // rotated or truncated
 
@@ -80,13 +79,9 @@ export function updateLiveStats(statePath: string, transcriptPath: string): Live
         if (message.usage) {
           let contextSnapshot = 0;
           for (const k of ['input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens']) {
-            if (typeof message.usage[k] === 'number') {
-              state.tokens += message.usage[k] as number;
-              contextSnapshot += message.usage[k] as number;
-            }
+            if (typeof message.usage[k] === 'number') contextSnapshot += message.usage[k] as number;
           }
           state.contextTokens = contextSnapshot;
-          if (typeof message.usage['output_tokens'] === 'number') state.tokens += message.usage['output_tokens'] as number;
         }
         if (!Array.isArray(message.content)) continue;
         for (const b of message.content as Record<string, unknown>[]) {
@@ -107,7 +102,7 @@ export function updateLiveStats(statePath: string, transcriptPath: string): Live
   }
 
   return {
-    files: state.filesEdited.length, commands: state.commandCount, tokens: state.tokens,
+    files: state.filesEdited.length, commands: state.commandCount,
     rateLimitResetAt: state.rateLimitResetAt, contextTokens: state.contextTokens,
   };
 }

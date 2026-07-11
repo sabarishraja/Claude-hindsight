@@ -20,14 +20,14 @@ describe('updateLiveStats', () => {
     const state = join(dir, 'state', 's.json');
 
     writeFileSync(transcript, toolUseLine([edit('a.ts'), bash('npm test')]));
-    expect(updateLiveStats(state, transcript)).toEqual({ files: 1, commands: 1, tokens: 0, rateLimitResetAt: null, contextTokens: null });
+    expect(updateLiveStats(state, transcript)).toEqual({ files: 1, commands: 1, rateLimitResetAt: null, contextTokens: null });
 
     appendFileSync(transcript, toolUseLine([edit('a.ts'), edit('b.ts'), bash('git status')]));
     // a.ts deduped across increments; commands accumulate
-    expect(updateLiveStats(state, transcript)).toEqual({ files: 2, commands: 2, tokens: 0, rateLimitResetAt: null, contextTokens: null });
+    expect(updateLiveStats(state, transcript)).toEqual({ files: 2, commands: 2, rateLimitResetAt: null, contextTokens: null });
 
     // no growth: same result, nothing re-parsed
-    expect(updateLiveStats(state, transcript)).toEqual({ files: 2, commands: 2, tokens: 0, rateLimitResetAt: null, contextTokens: null });
+    expect(updateLiveStats(state, transcript)).toEqual({ files: 2, commands: 2, rateLimitResetAt: null, contextTokens: null });
   });
 
   it('ignores a trailing partial line until it is completed', () => {
@@ -37,10 +37,10 @@ describe('updateLiveStats', () => {
 
     const full = toolUseLine([bash('one')]);
     writeFileSync(transcript, full + '{"type":"assist'); // partial second line
-    expect(updateLiveStats(state, transcript)).toEqual({ files: 0, commands: 1, tokens: 0, rateLimitResetAt: null, contextTokens: null });
+    expect(updateLiveStats(state, transcript)).toEqual({ files: 0, commands: 1, rateLimitResetAt: null, contextTokens: null });
 
     appendFileSync(transcript, 'ant","message":{"content":[' + JSON.stringify(bash('two')) + ']}}\n');
-    expect(updateLiveStats(state, transcript)).toEqual({ files: 0, commands: 2, tokens: 0, rateLimitResetAt: null, contextTokens: null });
+    expect(updateLiveStats(state, transcript)).toEqual({ files: 0, commands: 2, rateLimitResetAt: null, contextTokens: null });
   });
 
   it('resets when the transcript shrinks, and survives a missing transcript', () => {
@@ -49,28 +49,12 @@ describe('updateLiveStats', () => {
     const state = join(dir, 's.json');
 
     writeFileSync(transcript, toolUseLine([bash('a')]) + toolUseLine([bash('b')]));
-    expect(updateLiveStats(state, transcript)).toEqual({ files: 0, commands: 2, tokens: 0, rateLimitResetAt: null, contextTokens: null });
+    expect(updateLiveStats(state, transcript)).toEqual({ files: 0, commands: 2, rateLimitResetAt: null, contextTokens: null });
 
     writeFileSync(transcript, toolUseLine([bash('only')])); // truncated/rotated
-    expect(updateLiveStats(state, transcript)).toEqual({ files: 0, commands: 1, tokens: 0, rateLimitResetAt: null, contextTokens: null });
+    expect(updateLiveStats(state, transcript)).toEqual({ files: 0, commands: 1, rateLimitResetAt: null, contextTokens: null });
 
-    expect(updateLiveStats(state, join(dir, 'missing.jsonl'))).toEqual({ files: 0, commands: 0, tokens: 0, rateLimitResetAt: null, contextTokens: null });
-  });
-
-  it('accumulates tokens from usage blocks across calls', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'hindsight-live-'));
-    const transcript = join(dir, 't.jsonl');
-    const state = join(dir, 's.json');
-
-    writeFileSync(transcript, assistantWithUsage({
-      input_tokens: 100, cache_creation_input_tokens: 20, cache_read_input_tokens: 5, output_tokens: 50,
-    }));
-    // 100 + 20 + 5 + 50 = 175
-    expect(updateLiveStats(state, transcript)).toEqual({ files: 0, commands: 0, tokens: 175, rateLimitResetAt: null, contextTokens: 125 });
-
-    appendFileSync(transcript, assistantWithUsage({ input_tokens: 10, output_tokens: 10 }));
-    // + 20
-    expect(updateLiveStats(state, transcript)).toEqual({ files: 0, commands: 0, tokens: 195, rateLimitResetAt: null, contextTokens: 10 });
+    expect(updateLiveStats(state, join(dir, 'missing.jsonl'))).toEqual({ files: 0, commands: 0, rateLimitResetAt: null, contextTokens: null });
   });
 
   it('skips non-numeric or missing usage fields without throwing', () => {
@@ -79,34 +63,21 @@ describe('updateLiveStats', () => {
     const state = join(dir, 's.json');
 
     writeFileSync(transcript, assistantWithUsage({ input_tokens: 'not a number', output_tokens: 30 }));
-    expect(updateLiveStats(state, transcript)).toEqual({ files: 0, commands: 0, tokens: 30, rateLimitResetAt: null, contextTokens: 0 });
+    expect(updateLiveStats(state, transcript)).toEqual({ files: 0, commands: 0, rateLimitResetAt: null, contextTokens: 0 });
   });
 
-  it('resets tokens to 0 when the transcript shrinks', () => {
+  it('resets contextTokens to null when the transcript shrinks', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hindsight-live-'));
     const transcript = join(dir, 't.jsonl');
     const state = join(dir, 's.json');
 
     writeFileSync(transcript, assistantWithUsage({ input_tokens: 100, output_tokens: 100 }));
-    expect(updateLiveStats(state, transcript)).toEqual({ files: 0, commands: 0, tokens: 200, rateLimitResetAt: null, contextTokens: 100 });
+    expect(updateLiveStats(state, transcript)).toEqual({ files: 0, commands: 0, rateLimitResetAt: null, contextTokens: 100 });
 
     // Genuinely shorter than the first write (46 bytes vs 95) so it actually triggers the
     // rotated/truncated reset path (size < state.bytesRead) rather than being read as a suffix.
     writeFileSync(transcript, JSON.stringify({ type: 'assistant', message: { content: [] } }) + '\n');
-    expect(updateLiveStats(state, transcript)).toEqual({ files: 0, commands: 0, tokens: 0, rateLimitResetAt: null, contextTokens: null });
-  });
-
-  it('treats a pre-existing state file without a tokens field as tokens: 0, not corrupt', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'hindsight-live-'));
-    const transcript = join(dir, 't.jsonl');
-    const state = join(dir, 's.json');
-
-    // Simulate a state file written before this feature shipped.
-    writeFileSync(transcript, toolUseLine([bash('a')]));
-    writeFileSync(state, JSON.stringify({ bytesRead: 0, filesEdited: [], commandCount: 0 }));
-
-    // bytesRead: 0 means the whole transcript is re-parsed, contributing 1 command and 0 tokens.
-    expect(updateLiveStats(state, transcript)).toEqual({ files: 0, commands: 1, tokens: 0, rateLimitResetAt: null, contextTokens: null });
+    expect(updateLiveStats(state, transcript)).toEqual({ files: 0, commands: 0, rateLimitResetAt: null, contextTokens: null });
   });
 
   it('tracks the latest rate-limit reset time seen live', () => {
@@ -160,7 +131,7 @@ describe('updateLiveStats', () => {
     const state = join(dir, 's.json');
 
     writeFileSync(transcript, toolUseLine([bash('a')]));
-    writeFileSync(state, JSON.stringify({ bytesRead: 0, filesEdited: [], commandCount: 0, tokens: 0 }));
+    writeFileSync(state, JSON.stringify({ bytesRead: 0, filesEdited: [], commandCount: 0 }));
     const result = updateLiveStats(state, transcript);
     expect(result.rateLimitResetAt).toBe(null);
     expect(result.contextTokens).toBe(null);
