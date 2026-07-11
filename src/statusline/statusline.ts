@@ -5,6 +5,7 @@ import { buildBriefing } from '../analyzer/briefing.js';
 import { updateLiveStats } from './liveSession.js';
 import { renderStatusline, getContextLimit, type StatuslineView } from './render.js';
 import { getArchitectureView } from '../architecture/architecture.js';
+import { readOversightStats } from './oversight.js';
 import type { PolishResult } from '../types.js';
 
 interface StdinData {
@@ -52,7 +53,12 @@ export function runStatusline(stdinText: string, dataDir: string, now: () => Dat
     sessionCount: 0,
     resetMinutesRemaining: null,
     context: null,
+    oversight: null,
   };
+
+  // Oversight's verification log lives on disk per project, independent of the index.
+  const cwd = data.workspace?.project_dir ?? data.workspace?.current_dir ?? process.cwd();
+  view.oversight = readOversightStats(cwd, data.session_id);
 
   let latestReset: string | null = null;
 
@@ -77,7 +83,6 @@ export function runStatusline(stdinText: string, dataDir: string, now: () => Dat
         latestReset = indexedReset;
       }
 
-      const cwd = data.workspace?.project_dir ?? data.workspace?.current_dir ?? process.cwd();
       const project = findProjectForCwd(store.listProjects(), cwd);
       if (project) {
         // Exclude the running session: a SessionStart-hook re-index may have

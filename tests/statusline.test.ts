@@ -76,6 +76,45 @@ describe('runStatusline', () => {
     expect(strip(runStatusline(stdin, dataDir))).toContain('refactor the indexer');
   });
 
+  it('shows the oversight tally when the project has verification history for this session', () => {
+    const { dataDir, transcript } = setup();
+    const cwd = mkdtempSync(join(tmpdir(), 'hindsight-ov-'));
+    mkdirSync(join(cwd, '.oversight'), { recursive: true });
+    writeFileSync(join(cwd, '.oversight', 'history.jsonl'), JSON.stringify({
+      ts: 1720000000.5, session_id: 'current', claim: 'done', decision: 'allow',
+      results: [
+        { kind: 'tests', target: 'npm test', status: 'pass', source: 't', detail: '' },
+        { kind: 'tests', target: 'npm test', status: 'pass', source: 't', detail: '' },
+        { kind: 'build', target: 'npm run build', status: 'fail', source: 'b', detail: '' },
+      ],
+    }) + '\n');
+    const stdin = JSON.stringify({
+      ...JSON.parse(stdinFor(dataDir, transcript)) as object,
+      workspace: { current_dir: cwd, project_dir: cwd },
+    });
+    expect(strip(runStatusline(stdin, dataDir))).toContain('🕵 2✓ 1✗');
+  });
+
+  it('omits the oversight tally when history only covers other sessions', () => {
+    const { dataDir, transcript } = setup();
+    const cwd = mkdtempSync(join(tmpdir(), 'hindsight-ov-'));
+    mkdirSync(join(cwd, '.oversight'), { recursive: true });
+    writeFileSync(join(cwd, '.oversight', 'history.jsonl'), JSON.stringify({
+      ts: 1, session_id: 'some-other-session', claim: 'x', decision: 'block',
+      results: [{ kind: 'tests', target: 't', status: 'fail', source: '', detail: '' }],
+    }) + '\n');
+    const stdin = JSON.stringify({
+      ...JSON.parse(stdinFor(dataDir, transcript)) as object,
+      workspace: { current_dir: cwd, project_dir: cwd },
+    });
+    expect(strip(runStatusline(stdin, dataDir))).not.toContain('🕵');
+  });
+
+  it('omits the oversight tally when no history file exists', () => {
+    const { dataDir, transcript } = setup();
+    expect(strip(runStatusline(stdinFor(dataDir, transcript), dataDir))).not.toContain('🕵');
+  });
+
   it('returns usage for bad or missing stdin', () => {
     const dataDir = mkdtempSync(join(tmpdir(), 'hindsight-sl-'));
     expect(runStatusline('', dataDir)).toBe(USAGE);
