@@ -9,7 +9,7 @@ const strip = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
 const base: StatuslineView = {
   last: null, indexed: true, modelName: 'Fable 5', costUsd: 0.42,
   liveFiles: 3, liveCommands: 12, sessionCount: 47,
-  resetMinutesRemaining: null, context: null,
+  resetMinutesRemaining: null, context: null, oversight: null,
 };
 
 describe('formatTokenCount', () => {
@@ -143,6 +143,28 @@ describe('renderStatusline', () => {
     };
     const row1 = strip(renderStatusline(view, new Date('2026-07-06T10:00:00Z'))).split('\n')[0];
     expect(row1).toContain('▲ arch doc 3 sessions behind');
+  });
+
+  it('renders the oversight tally with mixed pass/fail counts', () => {
+    const row2 = strip(renderStatusline({ ...base, oversight: { pass: 3, fail: 1 } })).split('\n')[1];
+    expect(row2).toContain('🕵 3✓ 1✗');
+  });
+
+  it('omits zero counts within the oversight tally', () => {
+    const passOnly = strip(renderStatusline({ ...base, oversight: { pass: 2, fail: 0 } })).split('\n')[1];
+    expect(passOnly).toContain('🕵 2✓');
+    expect(passOnly).not.toContain('✗');
+    expect(strip(renderStatusline({ ...base, oversight: { pass: 0, fail: 4 } })).split('\n')[1])
+      .toContain('🕵 4✗');
+  });
+
+  it('colors the fail count red', () => {
+    const raw = renderStatusline({ ...base, oversight: { pass: 1, fail: 2 } }).split('\n')[1];
+    expect(raw).toContain('\x1b[31m2✗');
+  });
+
+  it('omits the oversight segment entirely when null', () => {
+    expect(strip(renderStatusline(base)).split('\n')[1]).not.toContain('🕵');
   });
 
   it('omits the arch-staleness segment when zero or unset', () => {

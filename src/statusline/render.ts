@@ -1,4 +1,5 @@
 import { ANSI, ENDING_LABEL, relativeTime, truncate } from '../terminal/render.js';
+import type { OversightStats } from './oversight.js';
 
 export interface LastSessionView {
   when: string | null;
@@ -17,6 +18,7 @@ export interface StatuslineView {
   sessionCount: number;
   resetMinutesRemaining: number | null;  // null => no real, still-future reset time detected
   context: { used: number; limit: number } | null; // null => no assistant turn yet this session
+  oversight: OversightStats | null;      // null => nothing verified this session; omit segment
   archStaleBy?: number;          // undefined/0 => no nudge; >0 => sessions behind
 }
 
@@ -99,6 +101,12 @@ export function renderStatusline(view: StatuslineView, now: Date = new Date()): 
   if (view.costUsd !== null) segments.push(`$${view.costUsd.toFixed(2)}`);
   if (view.resetMinutesRemaining !== null) segments.push(formatResetCountdown(view.resetMinutesRemaining));
   segments.push(`${view.liveFiles} files · ${view.liveCommands} cmds`);
+  if (view.oversight !== null) {
+    const parts: string[] = [];
+    if (view.oversight.pass > 0) parts.push(`${view.oversight.pass}✓`);
+    if (view.oversight.fail > 0) parts.push(p(ANSI.red, `${view.oversight.fail}✗`));
+    segments.push(`🕵 ${parts.join(' ')}`);
+  }
   segments.push(p(ANSI.dim, `${view.sessionCount} session${view.sessionCount === 1 ? '' : 's'} indexed`));
 
   const row2 = row1 + '\n' + segments.join(p(ANSI.orange, ' │ '));
