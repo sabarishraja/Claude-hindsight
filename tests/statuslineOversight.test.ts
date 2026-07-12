@@ -129,4 +129,57 @@ describe('readOversightStats', () => {
       pass: 0, fail: 1, lastFailKind: 'unknown', extraFailKinds: 0,
     });
   });
+
+  it('collapses an identical double-fired pair within 120s', () => {
+    const cwd = writeHistory(tmpdir(), [
+      eventWith('sess-1', [{ kind: 'file_created', status: 'fail', detail: 'file missing' }],
+        { claim: 'Done — created it', ts: 1000 }),
+      eventWith('sess-1', [{ kind: 'file_created', status: 'fail', detail: 'file missing' }],
+        { claim: 'Done — created it', ts: 1060 }),
+    ]);
+    expect(readOversightStats(cwd, 'sess-1')).toEqual({
+      pass: 0, fail: 1, lastFailKind: 'file_created', extraFailKinds: 0,
+    });
+  });
+
+  it('keeps identical events more than 120s apart (a genuine repeat)', () => {
+    const cwd = writeHistory(tmpdir(), [
+      eventWith('sess-1', [{ status: 'pass' }], { claim: 'Done', ts: 1000 }),
+      eventWith('sess-1', [{ status: 'pass' }], { claim: 'Done', ts: 1200 }),
+    ]);
+    expect(readOversightStats(cwd, 'sess-1')).toEqual({
+      pass: 2, fail: 0, lastFailKind: null, extraFailKinds: 0,
+    });
+  });
+
+  it('keeps same-claim events whose detail differs (real re-verification)', () => {
+    const cwd = writeHistory(tmpdir(), [
+      eventWith('sess-1', [{ status: 'pass', detail: 'exited 0 in 2.3s' }], { claim: 'Done', ts: 1000 }),
+      eventWith('sess-1', [{ status: 'pass', detail: 'exited 0 in 3.0s' }], { claim: 'Done', ts: 1060 }),
+    ]);
+    expect(readOversightStats(cwd, 'sess-1')).toEqual({
+      pass: 2, fail: 0, lastFailKind: null, extraFailKinds: 0,
+    });
+  });
+
+  it('never dedupes when ts is missing on either event', () => {
+    const cwd = writeHistory(tmpdir(), [
+      eventWith('sess-1', [{ status: 'pass' }], { claim: 'Done', ts: null }),
+      eventWith('sess-1', [{ status: 'pass' }], { claim: 'Done', ts: null }),
+    ]);
+    expect(readOversightStats(cwd, 'sess-1')).toEqual({
+      pass: 2, fail: 0, lastFailKind: null, extraFailKinds: 0,
+    });
+  });
+
+  it('dedupes a triple-fire chain against the first kept event', () => {
+    const cwd = writeHistory(tmpdir(), [
+      eventWith('sess-1', [{ status: 'pass' }], { claim: 'Done', ts: 1000 }),
+      eventWith('sess-1', [{ status: 'pass' }], { claim: 'Done', ts: 1060 }),
+      eventWith('sess-1', [{ status: 'pass' }], { claim: 'Done', ts: 1120 }),
+    ]);
+    expect(readOversightStats(cwd, 'sess-1')).toEqual({
+      pass: 1, fail: 0, lastFailKind: null, extraFailKinds: 0,
+    });
+  });
 });
