@@ -24,6 +24,17 @@ export interface StatuslineView {
 
 const MAX_WIDTH = 110; // keep rows on one line in typical terminals
 
+// Short, fixed-width hint for the most recent failed Oversight check.
+const OVERSIGHT_FAIL_LABEL: Record<string, string> = {
+  tests_pass: 'tests failed',
+  build_succeeds: 'build failed',
+  lint_clean: 'lint failed',
+  file_created: 'file missing',
+  file_modified: 'file not changed',
+  command_succeeded: 'command failed',
+  generic_done: 'claim unverified',
+};
+
 export function formatTokenCount(n: number): string {
   if (n < 1000) return String(n);
   if (n < 1_000_000) {
@@ -104,7 +115,12 @@ export function renderStatusline(view: StatuslineView, now: Date = new Date()): 
   if (view.oversight !== null) {
     const parts: string[] = [];
     if (view.oversight.pass > 0) parts.push(`${view.oversight.pass}✓`);
-    if (view.oversight.fail > 0) parts.push(p(ANSI.red, `${view.oversight.fail}✗`));
+    if (view.oversight.fail > 0) {
+      parts.push(p(ANSI.red, `${view.oversight.fail}✗`));
+      const label = OVERSIGHT_FAIL_LABEL[view.oversight.lastFailKind ?? ''] ?? 'check failed';
+      const extra = view.oversight.extraFailKinds > 0 ? ` +${view.oversight.extraFailKinds}` : '';
+      parts.push(p(ANSI.red, `· ${label}${extra}`));
+    }
     segments.push(`🕵 ${parts.join(' ')}`);
   }
   segments.push(p(ANSI.dim, `${view.sessionCount} session${view.sessionCount === 1 ? '' : 's'} indexed`));

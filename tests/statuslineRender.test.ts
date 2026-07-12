@@ -177,4 +177,35 @@ describe('renderStatusline', () => {
     const { archStaleBy: _drop, ...noField } = view;
     expect(strip(renderStatusline(noField)).split('\n')[0]).not.toContain('arch doc');
   });
+
+  it('appends a red failure hint naming the last failed kind', () => {
+    const view = { ...base, oversight: { pass: 4, fail: 2, lastFailKind: 'file_created', extraFailKinds: 0 } };
+    const row2 = strip(renderStatusline(view)).split('\n')[1];
+    expect(row2).toContain('🕵 4✓ 2✗ · file missing');
+    const raw = renderStatusline(view).split('\n')[1];
+    expect(raw).toContain('\x1b[31m· file missing');
+  });
+
+  it('appends +N for other distinct failed kinds', () => {
+    const row2 = strip(renderStatusline({
+      ...base, oversight: { pass: 1, fail: 3, lastFailKind: 'tests_pass', extraFailKinds: 2 },
+    })).split('\n')[1];
+    expect(row2).toContain('🕵 1✓ 3✗ · tests failed +2');
+  });
+
+  it('shows no hint when the session has no failures', () => {
+    const row2 = strip(renderStatusline({
+      ...base, oversight: { pass: 2, fail: 0, lastFailKind: null, extraFailKinds: 0 },
+    })).split('\n')[1];
+    expect(row2).toContain('🕵 2✓');
+    expect(row2).not.toContain('failed');
+    expect(row2).not.toContain('missing');
+  });
+
+  it('falls back to "check failed" for unknown kinds', () => {
+    const row2 = strip(renderStatusline({
+      ...base, oversight: { pass: 0, fail: 1, lastFailKind: 'quantum_entangled', extraFailKinds: 0 },
+    })).split('\n')[1];
+    expect(row2).toContain('🕵 1✗ · check failed');
+  });
 });
