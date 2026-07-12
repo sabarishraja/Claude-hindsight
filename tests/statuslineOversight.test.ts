@@ -172,6 +172,16 @@ describe('readOversightStats', () => {
     });
   });
 
+  it('does not merge distinct results whose fields collide when space-joined', () => {
+    const cwd = writeHistory(tmpdir(), [
+      eventWith('sess-1', [{ status: 'pass', detail: 'x y', target: 'z' }], { claim: 'Done', ts: 1000 }),
+      eventWith('sess-1', [{ status: 'pass', detail: 'x', target: 'y z' }], { claim: 'Done', ts: 1060 }),
+    ]);
+    expect(readOversightStats(cwd, 'sess-1')).toEqual({
+      pass: 2, fail: 0, lastFailKind: null, extraFailKinds: 0,
+    });
+  });
+
   it('dedupes a triple-fire chain against the first kept event', () => {
     const cwd = writeHistory(tmpdir(), [
       eventWith('sess-1', [{ status: 'pass' }], { claim: 'Done', ts: 1000 }),

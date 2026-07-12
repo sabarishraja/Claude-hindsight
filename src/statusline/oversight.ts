@@ -1,4 +1,4 @@
-﻿import { readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 export interface OversightStats {
@@ -25,7 +25,7 @@ function eventSignature(claim: unknown, results: unknown[]): string | null {
     const rec = (typeof r === 'object' && r !== null) ? (r as Record<string, unknown>) : {};
     return [rec.kind, rec.status, rec.detail, rec.target]
       .map((v) => (typeof v === 'string' ? v : ''))
-      .join(' ');
+      .join('\u0000'); // NUL separator
   });
   return JSON.stringify([claim, parts]);
 }
@@ -55,7 +55,7 @@ function tallyHistory(path: string, sessionId: string): OversightStats | null {
   let fail = 0;
   let lastFailKind: string | null = null;
   const failKinds = new Set<string>();
-  const lines = text.replace(/^﻿/, '').split('\n')
+  const lines = text.replace(/^\uFEFF/, '').split('\n')
     .map((l) => l.trim()).filter(Boolean).slice(-TAIL_LINES);
 
   let prevSig: string | null = null;
