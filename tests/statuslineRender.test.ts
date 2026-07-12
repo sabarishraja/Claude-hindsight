@@ -146,20 +146,20 @@ describe('renderStatusline', () => {
   });
 
   it('renders the oversight tally with mixed pass/fail counts', () => {
-    const row2 = strip(renderStatusline({ ...base, oversight: { pass: 3, fail: 1 } })).split('\n')[1];
+    const row2 = strip(renderStatusline({ ...base, oversight: { pass: 3, fail: 1, lastFailKind: 'tests_pass', extraFailKinds: 0 } })).split('\n')[1];
     expect(row2).toContain('🕵 3✓ 1✗');
   });
 
   it('omits zero counts within the oversight tally', () => {
-    const passOnly = strip(renderStatusline({ ...base, oversight: { pass: 2, fail: 0 } })).split('\n')[1];
+    const passOnly = strip(renderStatusline({ ...base, oversight: { pass: 2, fail: 0, lastFailKind: null, extraFailKinds: 0 } })).split('\n')[1];
     expect(passOnly).toContain('🕵 2✓');
     expect(passOnly).not.toContain('✗');
-    expect(strip(renderStatusline({ ...base, oversight: { pass: 0, fail: 4 } })).split('\n')[1])
+    expect(strip(renderStatusline({ ...base, oversight: { pass: 0, fail: 4, lastFailKind: 'tests_pass', extraFailKinds: 0 } })).split('\n')[1])
       .toContain('🕵 4✗');
   });
 
   it('colors the fail count red', () => {
-    const raw = renderStatusline({ ...base, oversight: { pass: 1, fail: 2 } }).split('\n')[1];
+    const raw = renderStatusline({ ...base, oversight: { pass: 1, fail: 2, lastFailKind: 'tests_pass', extraFailKinds: 0 } }).split('\n')[1];
     expect(raw).toContain('\x1b[31m2✗');
   });
 

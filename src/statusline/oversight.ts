@@ -4,6 +4,8 @@ import { join } from 'node:path';
 export interface OversightStats {
   pass: number;
   fail: number;
+  lastFailKind: string | null;  // kind of the most recent failed check; sticky for the session
+  extraFailKinds: number;       // other distinct failed kinds beyond lastFailKind
 }
 
 // history.jsonl is append-only and small; capping the tail keeps a pathological
@@ -33,6 +35,8 @@ function tallyHistory(path: string, sessionId: string): OversightStats | null {
   }
   let pass = 0;
   let fail = 0;
+  let lastFailKind: string | null = null;
+  const failKinds = new Set<string>();
   const lines = text.replace(/^\uFEFF/, '').split('\n')
     .map((l) => l.trim()).filter(Boolean).slice(-TAIL_LINES);
   for (const trimmed of lines) {
@@ -46,10 +50,16 @@ function tallyHistory(path: string, sessionId: string): OversightStats | null {
     const e = event as { session_id?: unknown; results?: unknown };
     if (e.session_id !== sessionId || !Array.isArray(e.results)) continue;
     for (const r of e.results as unknown[]) {
-      const status = (r as { status?: unknown } | null)?.status;
-      if (status === 'pass') pass++;
-      else if (status === 'fail') fail++;
+      const rec = (typeof r === 'object' && r !== null) ? (r as { status?: unknown; kind?: unknown }) : null;
+      if (rec?.status === 'pass') pass++;
+      else if (rec?.status === 'fail') {
+        fail++;
+        const kind = typeof rec.kind === 'string' ? rec.kind : 'unknown';
+        lastFailKind = kind;
+        failKinds.add(kind);
+      }
     }
   }
-  return pass + fail > 0 ? { pass, fail } : null;
+  if (pass + fail === 0) return null;
+  return { pass, fail, lastFailKind, extraFailKinds: failKinds.size > 0 ? failKinds.size - 1 : 0 };
 }

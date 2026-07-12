@@ -4,16 +4,42 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readOversightStats } from '../src/statusline/oversight.js';
 
-function event(sessionId: string, statuses: string[]): string {
-  return JSON.stringify({
-    ts: 1720000000.5,
+let tsCounter = 1720000000;
+function nextTs(): number {
+  tsCounter += 300; // keep auto-generated events far outside any dedupe window
+  return tsCounter;
+}
+
+interface ResultSpec {
+  kind?: string;
+  status: string;
+  detail?: string;
+  target?: string | null;
+}
+
+function eventWith(
+  sessionId: string,
+  results: ResultSpec[],
+  opts: { claim?: string; ts?: number | null } = {},
+): string {
+  const obj: Record<string, unknown> = {
     session_id: sessionId,
-    claim: 'All tests pass',
+    claim: opts.claim ?? 'All tests pass',
     decision: 'allow',
-    results: statuses.map((status) => ({
-      kind: 'tests', target: 'npm test', status, source: 'tests pass', detail: '',
+    results: results.map((r) => ({
+      kind: r.kind ?? 'tests_pass',
+      target: r.target ?? 'npm test',
+      status: r.status,
+      source: 'tests pass',
+      detail: r.detail ?? '',
     })),
-  });
+  };
+  if (opts.ts !== null) obj.ts = opts.ts ?? nextTs();
+  return JSON.stringify(obj);
+}
+
+function event(sessionId: string, statuses: string[]): string {
+  return eventWith(sessionId, statuses.map((status) => ({ status })));
 }
 
 function writeHistory(dir: string, lines: string[], sub = '.oversight'): string {
@@ -29,7 +55,7 @@ describe('readOversightStats', () => {
       event('sess-1', ['pass', 'pass', 'fail']),
       event('sess-1', ['pass', 'unverifiable', 'skipped']),
     ]);
-    expect(readOversightStats(cwd, 'sess-1')).toEqual({ pass: 3, fail: 1 });
+    expect(readOversightStats(cwd, 'sess-1')).toEqual({ pass: 3, fail: 1, lastFailKind: 'tests_pass', extraFailKinds: 0 });
   });
 
   it('returns null when the history file is absent', () => {
@@ -55,18 +81,52 @@ describe('readOversightStats', () => {
       JSON.stringify({ session_id: 'sess-1' }), // no results array
       event('sess-1', ['pass']),
     ]);
-    expect(readOversightStats(cwd, 'sess-1')).toEqual({ pass: 1, fail: 0 });
+    expect(readOversightStats(cwd, 'sess-1')).toEqual({ pass: 1, fail: 0, lastFailKind: null, extraFailKinds: 0 });
   });
 
   it('falls back to the legacy .lie-detector directory (pre-rename hook data)', () => {
     const cwd = writeHistory(tmpdir(), [event('sess-1', ['pass', 'fail'])], '.lie-detector');
-    expect(readOversightStats(cwd, 'sess-1')).toEqual({ pass: 1, fail: 1 });
+    expect(readOversightStats(cwd, 'sess-1')).toEqual({ pass: 1, fail: 1, lastFailKind: 'tests_pass', extraFailKinds: 0 });
   });
 
   it('only counts the last 200 lines of a large history file', () => {
     const old = Array.from({ length: 250 }, () => event('sess-1', ['fail']));
     const recent = Array.from({ length: 200 }, () => event('sess-1', ['pass']));
     const cwd = writeHistory(tmpdir(), [...old, ...recent]);
-    expect(readOversightStats(cwd, 'sess-1')).toEqual({ pass: 200, fail: 0 });
+    expect(readOversightStats(cwd, 'sess-1')).toEqual({ pass: 200, fail: 0, lastFailKind: null, extraFailKinds: 0 });
+  });
+
+  it('reports the most recent failed kind, sticky across later passes', () => {
+    const cwd = writeHistory(tmpdir(), [
+      eventWith('sess-1', [{ kind: 'file_created', status: 'fail' }]),
+      eventWith('sess-1', [{ kind: 'tests_pass', status: 'pass' }]),
+    ]);
+    expect(readOversightStats(cwd, 'sess-1')).toEqual({
+      pass: 1, fail: 1, lastFailKind: 'file_created', extraFailKinds: 0,
+    });
+  });
+
+  it('counts other distinct failed kinds, not repeats of the same kind', () => {
+    const cwd = writeHistory(tmpdir(), [
+      eventWith('sess-1', [{ kind: 'tests_pass', status: 'fail' }]),
+      eventWith('sess-1', [{ kind: 'tests_pass', status: 'fail' }], { claim: 'Second try' }),
+      eventWith('sess-1', [{ kind: 'build_succeeds', status: 'fail' }]),
+      eventWith('sess-1', [{ kind: 'file_created', status: 'fail' }]),
+    ]);
+    expect(readOversightStats(cwd, 'sess-1')).toEqual({
+      pass: 0, fail: 4, lastFailKind: 'file_created', extraFailKinds: 2,
+    });
+  });
+
+  it('treats a failed result with a missing kind as "unknown"', () => {
+    const cwd = writeHistory(tmpdir(), [
+      JSON.stringify({
+        ts: nextTs(), session_id: 'sess-1', claim: 'x', decision: 'block',
+        results: [{ status: 'fail' }],
+      }),
+    ]);
+    expect(readOversightStats(cwd, 'sess-1')).toEqual({
+      pass: 0, fail: 1, lastFailKind: 'unknown', extraFailKinds: 0,
+    });
   });
 });
