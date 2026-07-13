@@ -6,6 +6,7 @@ import { updateLiveStats } from './liveSession.js';
 import { renderStatusline, getContextLimit, type StatuslineView } from './render.js';
 import { getArchitectureView } from '../architecture/architecture.js';
 import { readOversightStats } from './oversight.js';
+import { readGlobalReset, writeGlobalReset } from './globalReset.js';
 import type { PolishResult } from '../types.js';
 
 interface StdinData {
@@ -111,6 +112,14 @@ export function runStatusline(stdinText: string, dataDir: string, now: () => Dat
     } finally {
       store.close();
     }
+  }
+
+  const broadcastReset = readGlobalReset(dataDir);
+  if (broadcastReset !== null && (latestReset === null || broadcastReset > latestReset)) {
+    latestReset = broadcastReset;
+  }
+  if (latestReset !== null && (broadcastReset === null || latestReset > broadcastReset)) {
+    writeGlobalReset(dataDir, latestReset);
   }
 
   const nowDate = now();

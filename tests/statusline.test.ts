@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, existsSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -283,5 +283,69 @@ describe('runStatusline', () => {
     });
     const out = strip(runStatusline(stdin, dataDir));
     expect(out.split('\n')).toHaveLength(2);
+  });
+
+  it('shows a reset countdown from a pre-existing global broadcast file alone', () => {
+    const { dataDir, transcript } = setup();
+    mkdirSync(join(dataDir, 'statusline'), { recursive: true });
+    writeFileSync(
+      join(dataDir, 'statusline', 'global-reset.json'),
+      JSON.stringify({ resetAt: '2026-07-06T11:12:00Z' }),
+    );
+
+    const now = () => new Date('2026-07-06T10:00:00Z');
+    const row2 = strip(runStatusline(stdinFor(dataDir, transcript), dataDir, now)).split('\n')[1];
+    expect(row2).toContain('resets in 1h 12m');
+  });
+
+  it('writes a newly-discovered live reset time to the global broadcast file', () => {
+    const { dataDir } = setup();
+    const transcript = join(dataDir, 'reset-live.jsonl');
+    writeFileSync(transcript, JSON.stringify({
+      type: 'assistant', timestamp: '2026-07-06T09:48:00.000Z',
+      message: {
+        role: 'assistant',
+        content: [{ type: 'text', text: "You've hit your session limit · resets 11:12am (UTC)" }],
+      },
+      error: 'rate_limit', isApiErrorMessage: true,
+    }) + '\n');
+
+    const stdin = JSON.stringify({
+      session_id: 'current', transcript_path: transcript,
+      workspace: { current_dir: 'C:\\work\\app', project_dir: 'C:\\work\\app' },
+    });
+
+    const now = () => new Date('2026-07-06T10:00:00Z');
+    runStatusline(stdin, dataDir, now);
+
+    const broadcast = JSON.parse(
+      readFileSync(join(dataDir, 'statusline', 'global-reset.json'), 'utf8'),
+    ) as { resetAt: string };
+    expect(broadcast.resetAt).toBe('2026-07-06T11:12:00.000Z');
+  });
+
+  it('does not let an older DB/live reset overwrite a fresher broadcast value', () => {
+    const { dataDir, transcript } = setup();
+    const store = new Store(join(dataDir, 'index.db'));
+    store.upsertSession(facts({
+      sessionId: 'older-reset', projectDir: 'proj', cwd: 'C:\\work\\app', goal: 'old limit hit',
+      lastTs: '2026-07-06T09:00:00Z', rateLimitResetAt: '2026-07-06T11:12:00Z',
+    }));
+    store.close();
+
+    mkdirSync(join(dataDir, 'statusline'), { recursive: true });
+    writeFileSync(
+      join(dataDir, 'statusline', 'global-reset.json'),
+      JSON.stringify({ resetAt: '2026-07-06T13:00:00Z' }),
+    );
+
+    const now = () => new Date('2026-07-06T10:00:00Z');
+    const row2 = strip(runStatusline(stdinFor(dataDir, transcript), dataDir, now)).split('\n')[1];
+    expect(row2).toContain('resets in 3h 0m');
+
+    const broadcast = JSON.parse(
+      readFileSync(join(dataDir, 'statusline', 'global-reset.json'), 'utf8'),
+    ) as { resetAt: string };
+    expect(broadcast.resetAt).toBe('2026-07-06T13:00:00Z');
   });
 });
