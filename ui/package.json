@@ -1,5 +1,6 @@
 {
   "name": "claude-hindsight-ui",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "scripts": { "dev": "vite", "build": "vite build" },

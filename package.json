@@ -1,6 +1,6 @@
 {
   "name": "claude-hindsight",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Local dashboard for Claude Code: project briefings and CLAUDE.md instruction audits from your own transcripts",
   "type": "module",
   "bin": {
@@ -8,6 +8,7 @@
   },
   "files": [
     "dist",
+    "ui/dist",
     "README.md",
     "LICENSE",
     ".claude-plugin",
@@ -20,7 +21,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && npm run build --prefix ui",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
   "license": "MIT",
   "dependencies": {

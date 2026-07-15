@@ -94,26 +94,12 @@ your previous session's story (ending badge, goal, and a ⚠ marker if it ended 
 an unanswered question); row 2 shows the current model, session cost, live
 files-edited/commands-run counts, and how many sessions are indexed.
 
-Row 2 also shows a rolling **5-hour token usage** total (`tok · 5h`), combining every indexed
-session across *all* your projects whose activity falls in the trailing 5 hours with the
-current session's live, still-growing count — mirroring the rolling window Claude subscription
-plans actually rate-limit on. There's no percentage or "remaining" figure: no local or offline
-source exists for your plan's actual quota, and fetching one would require a network call this
-tool deliberately never makes. Two known approximations, honestly: indexed sessions are
-attributed to the window by when they *ended*, not per-message, so a session that ran long
-before ending just inside the window counts its whole total, and one that ended just outside the
-window is fully excluded even if most of its usage was inside it; the current session's live
-count is never windowed at all, so a session kept open past 5 hours keeps accumulating. And if
-you manually re-index while a long session is still open, that session's tokens could
-theoretically be counted once live and then again once indexed. All of these are rare or small in
-practice and informational-only — not correctness issues worth engineering per-message windowing
-around.
-
 When Claude Code itself reports a real rate-limit hit (a `429` with a "resets HH:MMam/pm
 (Timezone)" message — verified against real transcript data, not predicted from your usage
-pattern), the token segment gains a countdown: `3.9K tok · 5h — resets in 1h 12m`. No hit
-recorded, or the recorded reset time has already passed → no countdown shown, ever — silence
-is preferred over a guess.
+pattern), row 2 gains a countdown: `resets in 1h 12m`. No hit recorded, or the recorded reset
+time has already passed → no countdown shown, ever — silence is preferred over a guess. A
+discovered reset is also broadcast to your other open terminals so every session shows the same
+countdown, not just the one that hit the limit.
 
 A third row shows the current conversation's context-window fill against the model's context
 limit (200K by default — no local signal distinguishes the opt-in 1M-context beta from the
