@@ -107,14 +107,27 @@ default, so this may undercount for a session actually running with a larger win
 `Context [██████░░░░] 168K/200K (large codebase loaded)`. Hidden entirely until the first
 assistant turn of the session.
 
+**Enabling it — the statusline is a separate opt-in.** Claude Code's plugin format can't ship a
+statusLine (a plugin may only set `agent` and `subagentStatusLine`), so installing the
+claude-hindsight *plugin* wires up the MCP server and the SessionStart briefing, but **not** the
+statusline. To turn the statusline on, run the one-time installer — or, if you have the plugin,
+just run the bundled slash command:
+
 ```bash
-node dist/cli.js statusline --install            # wire into ~/.claude/settings.json
-node dist/cli.js statusline --install --project  # this project's .claude/settings.json instead
+npx claude-hindsight@latest statusline --install            # into ~/.claude/settings.json
+npx claude-hindsight@latest statusline --install --project  # this project's .claude/settings.json
 ```
 
-`--install` backs up your existing settings first and refuses to replace a
-different statusLine unless you pass `--force`. It never runs the indexer —
-row 1 updates when you next run `claude-hindsight` (or your SessionStart hook).
+```
+/claude-hindsight:statusline     # plugin users: same install, discoverable as a command
+```
+
+`--install` writes a portable `npx claude-hindsight statusline` command (no `@latest` — the
+statusline runs on every message, so it resolves the already-cached package offline rather than
+version-checking over the network on that hot path). It backs up your existing settings first and
+refuses to replace a different statusLine unless you pass `--force`. It never runs the indexer —
+row 1 updates when you next run `claude-hindsight` (or your SessionStart hook). Developing against
+a local build? Add `--local` to write an absolute path to your checked-out `dist/cli.js` instead.
 
 ### Architecture: a living map of your codebase
 

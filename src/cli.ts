@@ -10,7 +10,7 @@ import { buildBriefing } from './analyzer/briefing.js';
 import { renderBriefing, renderProjectList } from './terminal/render.js';
 import type { PolishResult } from './types.js';
 import { runStatusline } from './statusline/statusline.js';
-import { installStatusline } from './statusline/install.js';
+import { installStatusline, statuslineInstallCommand } from './statusline/install.js';
 import { refreshArchitecture, getArchitectureView } from './architecture/architecture.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createMcpServer } from './mcp/server.js';
@@ -127,8 +127,11 @@ function statuslineCommand(): void {
     const settingsPath = process.argv.includes('--project')
       ? join(process.cwd(), '.claude', 'settings.json')
       : join(homedir(), '.claude', 'settings.json');
-    const cliPath = fileURLToPath(import.meta.url);
-    const result = installStatusline(settingsPath, `node "${cliPath}" statusline`, process.argv.includes('--force'));
+    const command = statuslineInstallCommand(
+      process.argv.includes('--local'),
+      fileURLToPath(import.meta.url),
+    );
+    const result = installStatusline(settingsPath, command, process.argv.includes('--force'));
     console.log(result.message);
     if (result.action === 'refused') process.exitCode = 1;
     return;

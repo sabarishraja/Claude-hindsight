@@ -1,6 +1,6 @@
 {
   "name": "claude-hindsight",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Local dashboard for Claude Code: project briefings and CLAUDE.md instruction audits from your own transcripts",
   "type": "module",
   "bin": {
@@ -13,7 +13,8 @@
     "LICENSE",
     ".claude-plugin",
     ".mcp.json",
-    "hooks"
+    "hooks",
+    "commands"
   ],
   "engines": {
     "node": ">=20"

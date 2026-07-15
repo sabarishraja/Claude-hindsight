@@ -2,9 +2,23 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { installStatusline } from '../src/statusline/install.js';
+import { installStatusline, statuslineInstallCommand } from '../src/statusline/install.js';
 
 const CMD = 'node "C:\\tools\\dist\\cli.js" statusline';
+
+describe('statuslineInstallCommand', () => {
+  it('writes a portable npx command by default (no @latest, so it stays offline)', () => {
+    const cmd = statuslineInstallCommand(false, 'C:\\anywhere\\_npx\\abc\\cli.js');
+    expect(cmd).toBe('npx -y claude-hindsight statusline');
+    expect(cmd).not.toContain('@latest'); // the per-message hot path must not version-check
+    expect(cmd).not.toContain('_npx');    // never bake in an ephemeral npx cache path
+  });
+
+  it('writes an absolute local path when --local, for developing against a build', () => {
+    expect(statuslineInstallCommand(true, 'C:\\dev\\dist\\cli.js'))
+      .toBe('node "C:\\dev\\dist\\cli.js" statusline');
+  });
+});
 
 describe('installStatusline', () => {
   it('creates settings.json (and parent dir) when absent', () => {
