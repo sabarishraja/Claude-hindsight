@@ -7,6 +7,8 @@ import { auditInstructions } from '../analyzer/audit.js';
 import { discoverClaudeMds } from './configFiles.js';
 import { polishSession, defaultRunClaude, type ClaudeRunner } from './polish.js';
 import { getArchitectureView } from '../architecture/architecture.js';
+import { buildEvalView } from '../eval/view.js';
+import { join } from 'node:path';
 
 export interface ServerOptions {
   uiDist: string | null;
@@ -67,6 +69,16 @@ export function createServer(store: Store, options: ServerOptions): express.Expr
         return auditInstructions(parseInstructions(f.markdown, f.source), sessions);
       });
       res.json(reports);
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  app.get('/api/eval', (req, res) => {
+    try {
+      const fixturesDir = join(process.cwd(), 'tests', 'eval', 'fixtures', 'heldout');
+      const projectDir = typeof req.query.dir === 'string' ? req.query.dir : undefined;
+      res.json(buildEvalView(store, { fixturesDir, projectDir }));
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
     }
