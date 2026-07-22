@@ -211,6 +211,16 @@ async function main(): Promise<void> {
     await mcpCommand();
     return;
   }
+  if (process.argv[2] === 'eval') {
+    const { runEvalCli } = await import('./eval/cli.js');
+    const dataDir2 = join(homedir(), '.claude-hindsight');
+    mkdirSync(dataDir2, { recursive: true });
+    const store2 = new Store(join(dataDir2, 'index.db'));
+    const fixturesDir = join(process.cwd(), 'tests', 'eval', 'fixtures', 'train');
+    await runEvalCli(process.argv.slice(3), { store: store2, fixturesDir });
+    store2.close();
+    return;
+  }
   const claudeDir = arg('claude-dir', join(homedir(), '.claude'));
   const web = process.argv.includes('--web');
   const plain = process.argv.includes('--plain');
