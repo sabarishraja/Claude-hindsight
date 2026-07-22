@@ -26,7 +26,7 @@ export function computeObserved(sessions: SessionFacts[]): ObservedMetrics {
   const totalErrors = sessions.reduce((a, s) => a + s.errorCount, 0);
   const totalMessages = sessions.reduce((a, s) => a + s.messageCount, 0);
 
-  // Oldest-first so "preceding session" is well defined; nulls sort last.
+  // Oldest-first so "preceding session" is well defined; nulls (empty-string keys) sort first.
   const chron = [...sessions].sort((a, b) => (a.firstTs ?? '').localeCompare(b.firstTs ?? ''));
   let carrySum = 0, carryPairs = 0;
   for (let i = 1; i < chron.length; i++) {

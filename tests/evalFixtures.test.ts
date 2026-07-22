@@ -33,6 +33,14 @@ describe('loadFixture', () => {
     writeFixture('bar', 'deadbeef'); // wrong sha on purpose
     expect(() => loadFixture(dir, 'bar')).toThrow(/sha/i);
   });
+
+  it('throws when a label has an invalid verdict', () => {
+    const inputText = JSON.stringify(input);
+    writeFileSync(join(dir, 'baz.input.json'), inputText);
+    writeFileSync(join(dir, 'baz.labels.json'),
+      JSON.stringify({ inputSha256: sha256(inputText), labels: { 'CLAUDE.md:1': 'maybe' } }));
+    expect(() => loadFixture(dir, 'baz')).toThrow(/invalid verdict/i);
+  });
 });
 
 describe('loadFixtures', () => {

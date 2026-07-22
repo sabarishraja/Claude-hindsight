@@ -6,6 +6,7 @@ import { parseInstructions } from '../analyzer/instructions.js';
 import { sha256, listFixtureNames } from './fixtures.js';
 import { runEval, setLabel } from './run.js';
 import type { FixtureInput, ScoreReport, Verdict } from './types.js';
+import { VERDICTS } from './types.js';
 
 export function snapshotFixture(
   store: Store, projectDir: string, markdown: string, source: string, dir: string, name: string,
@@ -30,6 +31,14 @@ export function formatReport(r: ScoreReport): string {
   ];
   if (r.orphanedLabels.length) lines.push(`ORPHANED LABELS: ${r.orphanedLabels.join(', ')}`);
   if (r.unlabeledRules.length) lines.push(`UNLABELED RULES: ${r.unlabeledRules.join(', ')}`);
+  const short = (v: Verdict) => v.slice(0, 4);
+  lines.push('');
+  lines.push('confusion matrix (rows: expected, cols: predicted)');
+  lines.push(`        ${VERDICTS.map((p) => short(p).padStart(6)).join('')}`);
+  for (const e of VERDICTS) {
+    const row = VERDICTS.map((p) => String(r.confusion?.[e]?.[p] ?? 0).padStart(6)).join('');
+    lines.push(`${short(e).padEnd(8)}${row}`);
+  }
   return lines.join('\n');
 }
 

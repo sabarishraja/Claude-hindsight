@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import type { FixtureInput, FixtureLabels, LoadedFixture } from './types.js';
+import { VERDICTS } from './types.js';
 
 export function sha256(text: string): string {
   return createHash('sha256').update(text, 'utf8').digest('hex');
@@ -26,6 +27,14 @@ export function loadFixture(dir: string, name: string): LoadedFixture {
       `fixture ${name}: input sha mismatch — labels are stale for the current input.json ` +
       `(labels ${labelsFile.inputSha256 || '<empty>'}, input ${actual}). Re-label against the current input.`,
     );
+  }
+  for (const [ruleId, verdict] of Object.entries(labelsFile.labels)) {
+    if (!(VERDICTS as readonly string[]).includes(verdict)) {
+      throw new Error(
+        `fixture ${name}: label for ${ruleId} has invalid verdict "${verdict}" ` +
+        `(expected one of violated|followed|dead|unchecked)`,
+      );
+    }
   }
   return { name, input, labels: labelsFile.labels };
 }

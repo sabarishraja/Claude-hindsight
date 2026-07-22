@@ -42,5 +42,6 @@ describe('formatReport', () => {
     const text = formatReport(report);
     expect(text).toMatch(/confident accuracy/i);
     expect(text).toMatch(/violated misses.*1/i);
+    expect(text).toMatch(/confusion matrix/i);
   });
 });
