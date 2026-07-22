@@ -1,0 +1,14 @@
+{
+  "markdown": "- Tests live in `tests/`, never at the repo root.",
+  "source": "CLAUDE.md",
+  "sessions": [
+    {
+      "sessionId": "adv1", "projectDir": "p", "cwd": null, "goal": "poke at tests",
+      "firstTs": "2026-07-01T10:00:00Z", "lastTs": "2026-07-01T11:00:00Z",
+      "messageCount": 5, "inputTokens": 0, "outputTokens": 0, "rateLimitResetAt": null,
+      "filesEdited": ["tests/foo.test.ts"], "commandsRun": ["npx vitest run tests/foo.test.ts"],
+      "skillsInvoked": [], "errorCount": 0, "ending": "clean",
+      "lastUserText": null, "lastAssistantText": null, "skippedLines": 0
+    }
+  ]
+}
