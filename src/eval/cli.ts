@@ -1,12 +1,19 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 import { createInterface } from 'node:readline';
 import type { Store } from '../indexer/store.js';
 import { parseInstructions } from '../analyzer/instructions.js';
+import { discoverClaudeMds } from '../server/configFiles.js';
 import { sha256, listFixtureNames } from './fixtures.js';
 import { runEval, setLabel } from './run.js';
 import type { FixtureInput, ScoreReport, Verdict } from './types.js';
 import { VERDICTS } from './types.js';
+
+// Normalizes a path for cross-platform comparison: forward slashes, no trailing
+// separator, case-insensitive (matches the convention used in cli.ts / statusline.ts).
+function normPath(p: string): string {
+  return p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+}
 
 export function snapshotFixture(
   store: Store, projectDir: string, markdown: string, source: string, dir: string, name: string,
@@ -67,12 +74,42 @@ async function labelWalk(dir: string, name: string): Promise<void> {
 }
 
 // argv is process.argv.slice(3): the tokens after `eval`.
-export async function runEvalCli(argv: string[], deps: { store: Store; fixturesDir: string }): Promise<void> {
+export async function runEvalCli(
+  argv: string[],
+  deps: { store: Store; fixturesDir: string; claudeDir: string; cwd: string },
+): Promise<void> {
   const sub = argv[0];
   if (sub === 'label') {
     const name = argv[1];
     if (!name) { console.error('usage: eval label <fixture-name>'); process.exitCode = 1; return; }
     await labelWalk(deps.fixturesDir, name);
+    return;
+  }
+  if (sub === 'snapshot') {
+    const name = argv[1];
+    if (!name) { console.error('usage: eval snapshot <fixture-name>'); process.exitCode = 1; return; }
+    const projects = deps.store.listProjects();
+    const files = discoverClaudeMds(deps.claudeDir, projects);
+    const cwdByProject = new Map(projects.map((p) => [p.projectDir, p.cwd]));
+    const target = normPath(deps.cwd);
+    const match = files.find((f) => {
+      if (f.projectDir === null) return false;
+      const cwd = cwdByProject.get(f.projectDir);
+      return cwd != null && normPath(cwd) === target;
+    });
+    if (!match) {
+      console.log(
+        `No indexed project with a CLAUDE.md matches this directory (${deps.cwd}). ` +
+        'Run claude-hindsight here first to index it, and add a CLAUDE.md.',
+      );
+      return;
+    }
+    snapshotFixture(deps.store, match.projectDir!, match.markdown, match.source, deps.fixturesDir, name);
+    const sessionCount = deps.store.getSessions(match.projectDir!).length;
+    console.log(
+      `Snapshotted ${sessionCount} sessions + ${basename(match.source)} into ${name}.input.json. ` +
+      `Next: claude-hindsight eval label ${name}`,
+    );
     return;
   }
   // default: run and print

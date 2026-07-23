@@ -217,7 +217,8 @@ async function main(): Promise<void> {
     mkdirSync(dataDir2, { recursive: true });
     const store2 = new Store(join(dataDir2, 'index.db'));
     const fixturesDir = join(process.cwd(), 'tests', 'eval', 'fixtures', 'train');
-    await runEvalCli(process.argv.slice(3), { store: store2, fixturesDir });
+    const claudeDir2 = join(homedir(), '.claude');
+    await runEvalCli(process.argv.slice(3), { store: store2, fixturesDir, claudeDir: claudeDir2, cwd: process.cwd() });
     store2.close();
     return;
   }
