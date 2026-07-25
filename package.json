@@ -14,13 +14,15 @@
     ".claude-plugin",
     ".mcp.json",
     "hooks",
-    "commands"
+    "commands",
+    "scripts/postinstall.mjs"
   ],
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && npm run build --prefix ui",
+    "postinstall": "node scripts/postinstall.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build"
