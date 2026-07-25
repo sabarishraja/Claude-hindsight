@@ -37,3 +37,15 @@ export interface ArchitectureView {
 }
 export const fetchArchitecture = (dir: string) =>
   fetch(`/api/projects/${encodeURIComponent(dir)}/architecture`).then((r) => json<ArchitectureView>(r));
+
+export interface RefreshOutcome {
+  status: 'generated' | 'up-to-date' | 'rejected' | 'error';
+  message: string;
+  view: ArchitectureView;
+}
+export const refreshArchitecture = (dir: string, full = false) =>
+  fetch(`/api/projects/${encodeURIComponent(dir)}/architecture/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ full }),
+  }).then((r) => json<RefreshOutcome>(r));

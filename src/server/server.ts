@@ -6,7 +6,8 @@ import { parseInstructions } from '../analyzer/instructions.js';
 import { auditInstructions } from '../analyzer/audit.js';
 import { discoverClaudeMds } from './configFiles.js';
 import { polishSession, defaultRunClaude, type ClaudeRunner } from './polish.js';
-import { getArchitectureView } from '../architecture/architecture.js';
+import { getArchitectureView, refreshArchitecture } from '../architecture/architecture.js';
+import type { ArchRunner } from '../architecture/generate.js';
 import { buildEvalView } from '../eval/view.js';
 import { join } from 'node:path';
 
@@ -14,11 +15,13 @@ export interface ServerOptions {
   uiDist: string | null;
   claudeDir: string;
   claudeRunner?: ClaudeRunner;
+  archRunner?: ArchRunner;
   dataDir?: string;
 }
 
 const POLISH_BATCH_SIZE = 10;
 const inFlightPolish = new Set<string>();
+const inFlightArchitecture = new Set<string>();
 
 export function createServer(store: Store, options: ServerOptions): express.Express {
   const app = express();
@@ -110,6 +113,35 @@ export function createServer(store: Store, options: ServerOptions): express.Expr
       res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
     } finally {
       inFlightPolish.delete(dir);
+    }
+  });
+
+  // The dashboard's "Refresh" button. This is the one endpoint besides polish that spends
+  // time and tokens, so it's guarded the same way: one run per project at a time. Generation
+  // failures come back as a 200 with status 'error' rather than an HTTP error — refreshArchitecture
+  // already swallows them and keeps the previous doc, and the view treats that as a calm state.
+  app.post('/api/projects/:dir/architecture/refresh', async (req, res) => {
+    const dir = req.params.dir;
+    if (!options.dataDir) {
+      res.status(503).json({ error: 'architecture refresh unavailable: no data directory configured' });
+      return;
+    }
+    if (inFlightArchitecture.has(dir)) {
+      res.status(409).json({ error: 'architecture refresh already running for this project' });
+      return;
+    }
+    inFlightArchitecture.add(dir);
+    try {
+      const outcome = await refreshArchitecture(store, dir, {
+        dataDir: options.dataDir,
+        full: req.body?.full === true,
+        runner: options.archRunner,
+      });
+      res.json({ ...outcome, view: getArchitectureView(store, dir, options.dataDir) });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      inFlightArchitecture.delete(dir);
     }
   });
 

@@ -107,6 +107,83 @@ describe('API', () => {
     rmSync(archDataDir, { recursive: true, force: true });
   });
 
+  it('POST /api/projects/:dir/architecture/refresh generates a doc and returns the new view', async () => {
+    const rClaudeDir = mkdtempSync(join(tmpdir(), 'dost-refresh-claude-'));
+    const rDataDir = mkdtempSync(join(tmpdir(), 'dost-refresh-data-'));
+    const rStore = new Store(':memory:');
+    rStore.upsertSession(session({ sessionId: 'r-1', projectDir: 'proj-r' }));
+    const rApp = createServer(rStore, {
+      uiDist: null, claudeDir: rClaudeDir, dataDir: rDataDir,
+      archRunner: async () =>
+        '## What this app does\nx\n## The main parts\nx\n' +
+        '## How the pieces work together\nx\n' +
+        '## Architecture Diagram\n```mermaid\nflowchart TD\n  A --> B\n```\n' +
+        '## Recent changes\n- did a thing',
+    });
+    let rServer: Server;
+    await new Promise<void>((resolve) => { rServer = rApp.listen(0, resolve); });
+    const rAddr = rServer!.address();
+    const rBase = `http://127.0.0.1:${typeof rAddr === 'object' && rAddr ? rAddr.port : 0}`;
+
+    const res = await fetch(`${rBase}/api/projects/proj-r/architecture/refresh`, { method: 'POST' });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { status: string; message: string; view: { markdown: string; staleBy: number } };
+    expect(body.status).toBe('generated');
+    expect(body.view.markdown).toContain('What this app does');
+    expect(body.view.staleBy).toBe(0);
+
+    // Second call has nothing new to cover — a calm 'up-to-date', not an error.
+    const again = await fetch(`${rBase}/api/projects/proj-r/architecture/refresh`, { method: 'POST' });
+    expect((await again.json() as { status: string }).status).toBe('up-to-date');
+
+    rServer!.close();
+    rStore.close();
+    rmSync(rClaudeDir, { recursive: true, force: true });
+    rmSync(rDataDir, { recursive: true, force: true });
+  });
+
+  it('POST architecture/refresh returns 503 when no dataDir is configured', async () => {
+    const res = await fetch(`${base}/api/projects/proj-a/architecture/refresh`, { method: 'POST' });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toHaveProperty('error');
+  });
+
+  it('POST architecture/refresh rejects a concurrent run for the same project with 409', async () => {
+    let release: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const cClaudeDir = mkdtempSync(join(tmpdir(), 'dost-arch-conc-claude-'));
+    const cDataDir = mkdtempSync(join(tmpdir(), 'dost-arch-conc-data-'));
+    const cStore = new Store(':memory:');
+    cStore.upsertSession(session({ sessionId: 'c-1', projectDir: 'proj-c' }));
+    const cApp = createServer(cStore, {
+      uiDist: null, claudeDir: cClaudeDir, dataDir: cDataDir,
+      archRunner: async () => {
+        await gate;
+        return '## What this app does\nx\n## The main parts\nx\n' +
+          '## How the pieces work together\nx\n' +
+          '## Architecture Diagram\n```mermaid\nflowchart TD\n  A --> B\n```\n' +
+          '## Recent changes\n- did a thing';
+      },
+    });
+    let cServer: Server;
+    await new Promise<void>((resolve) => { cServer = cApp.listen(0, resolve); });
+    const cAddr = cServer!.address();
+    const cBase = `http://127.0.0.1:${typeof cAddr === 'object' && cAddr ? cAddr.port : 0}`;
+
+    const first = fetch(`${cBase}/api/projects/proj-c/architecture/refresh`, { method: 'POST' });
+    await new Promise((r) => setTimeout(r, 50));
+    const second = await fetch(`${cBase}/api/projects/proj-c/architecture/refresh`, { method: 'POST' });
+    expect(second.status).toBe(409);
+
+    release!();
+    expect((await first).status).toBe(200);
+
+    cServer!.close();
+    cStore.close();
+    rmSync(cClaudeDir, { recursive: true, force: true });
+    rmSync(cDataDir, { recursive: true, force: true });
+  });
+
   it('GET /api/audit returns JSON 500 when CLAUDE.md is a directory', async () => {
     const badClaudeDir = mkdtempSync(join(tmpdir(), 'dost-bad-claude-'));
     mkdirSync(join(badClaudeDir, 'CLAUDE.md'));
