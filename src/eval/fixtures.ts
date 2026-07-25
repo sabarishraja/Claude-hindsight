@@ -4,8 +4,13 @@ import { join } from 'node:path';
 import type { FixtureInput, FixtureLabels, LoadedFixture } from './types.js';
 import { VERDICTS } from './types.js';
 
+// Line endings are normalized before hashing because this hash is the staleness guard on a
+// *committed* file: git's autocrlf rewrites CRLF on checkout, so hashing raw bytes made the
+// fixture sha depend on the machine that cloned it, and the non-regression gate failed on a
+// fresh Windows clone with "labels are stale" for labels that were perfectly current.
+// .gitattributes pins these files to LF too — this is the belt to that suspenders.
 export function sha256(text: string): string {
-  return createHash('sha256').update(text, 'utf8').digest('hex');
+  return createHash('sha256').update(text.replace(/\r\n/g, '\n'), 'utf8').digest('hex');
 }
 
 export function listFixtureNames(dir: string): string[] {

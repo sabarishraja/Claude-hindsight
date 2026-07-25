@@ -1,0 +1,5 @@
+# Eval fixtures are content-addressed: `<name>.labels.json` stores a sha256 of
+# `<name>.input.json`, and a mismatch is treated as stale labels. If git rewrites line
+# endings on checkout, that hash changes and the non-regression gate fails on a fresh
+# clone. Pin them to LF on every platform so the committed sha is the sha everyone sees.
+tests/eval/fixtures/**/*.json -text eol=lf
