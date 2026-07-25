@@ -66,10 +66,15 @@ exact heuristic and its limitations — it is not an LLM judgment call).
   `--plain` (used for the `SessionStart` hook — see README).
 - **Web dashboard** (`src/server/server.ts` + `ui/`) — an Express server exposing read-only
   JSON endpoints (`/api/projects`, `/api/projects/:dir/briefing`, `/api/projects/:dir/
-  architecture`, `/api/audit`) plus one mutating endpoint (`POST /api/projects/:dir/polish`,
-  which shells out to `claude -p` to rewrite goal/outcome summaries, capped at 10 sessions per
-  call and guarded against concurrent runs per project via `inFlightPolish`). The React UI
-  (`ui/src/`) is a thin fetch-and-render client with no tests.
+  architecture`, `/api/audit`, `/api/eval`) plus two mutating endpoints, both of which shell
+  out to the `claude` CLI and are guarded against concurrent runs per project by an in-flight
+  `Set` (409 on collision): `POST /api/projects/:dir/polish` (rewrites goal/outcome summaries,
+  capped at 10 sessions per call, `inFlightPolish`) and
+  `POST /api/projects/:dir/architecture/refresh` (regenerates the architecture doc, accepts
+  `{ full: true }` for a full re-explore, `inFlightArchitecture`). The refresh endpoint returns
+  `200` with `refreshArchitecture`'s `{ status, message }` even when generation fails, because a
+  failed run keeps the previous doc — the UI treats that as a calm state, not an error. The
+  React UI (`ui/src/`) is a thin fetch-and-render client with no tests.
 - **Statusline** (`src/statusline/`) — a `claude-hindsight statusline` subcommand Claude Code
   invokes on every assistant message via the `statusLine` setting. It has a hard, load-bearing
   constraint: **it must never throw, exit nonzero, or print a stack trace**, and it must never

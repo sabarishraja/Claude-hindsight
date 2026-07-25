@@ -59,6 +59,10 @@ it was loaded into.
 
 ## Install
 
+**New here?** [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md) is a step-by-step tour of every
+surface — what to run, what you should see, and why it matters — written for someone who has
+never used this before.
+
 ```bash
 npm install
 npm run build
@@ -149,6 +153,13 @@ The doc lives under `~/.claude-hindsight/architecture/`, not in your repo —
 `--write` is the only thing that ever touches a file in your project. The
 terminal briefing, statusline, and web dashboard all show a small nudge when
 the doc has fallen behind the sessions you've actually run.
+
+You don't have to use the CLI for this. The dashboard's **Architecture** view has a
+**⟳ Refresh** button (and **Full rebuild**, the `--full` equivalent) that runs the same
+generation in place, plus a **✨ Generate now** button when a project has no doc yet. It's
+backed by `POST /api/projects/:dir/architecture/refresh`, which — like Polish — allows only one
+run per project at a time and returns `409` if you double-click it. A failed generation comes
+back as a normal response that keeps the previous doc rather than an error page.
 
 ### MCP: query hindsight live, mid-conversation
 
