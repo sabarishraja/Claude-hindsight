@@ -5,9 +5,17 @@ export interface SessionSummary {
   outcome: string | null;
 }
 
+// Stable opening lines of the two prompts Hindsight sends to the user's `claude` CLI. They
+// double as signatures: the indexer uses them to recognize (and drop) the transcripts those
+// calls leave behind, so keep each in lockstep with the first line of its builder below.
+export const FULL_PROMPT_SIGNATURE =
+  'Explore this codebase using the Read, Glob, and Grep tools available to you.';
+export const INCREMENTAL_PROMPT_SIGNATURE =
+  'You maintain a living architecture document for a codebase, written for a reader';
+
 export function buildFullPrompt(): string {
   return [
-    'Explore this codebase using the Read, Glob, and Grep tools available to you.',
+    FULL_PROMPT_SIGNATURE,
     'Then write a markdown document that explains the project to someone who does',
     'not read code and relies entirely on Claude Code to make changes. Avoid jargon;',
     'explain concepts in plain language.',
@@ -47,7 +55,7 @@ export function buildIncrementalPrompt(
     ? sessionSummaries.map((s) => `- ${s.goal}${s.outcome ? ` — ${s.outcome}` : ''}`).join('\n')
     : '(none)';
   return [
-    'You maintain a living architecture document for a codebase, written for a reader',
+    INCREMENTAL_PROMPT_SIGNATURE,
     'who does not read code. Below is the current document, the files that changed',
     'since it was last updated, and what the user was trying to do in those sessions.',
     'Update the document: revise any sections affected by the changes, and add ONE new',

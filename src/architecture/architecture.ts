@@ -21,6 +21,14 @@ export interface RefreshOutcome {
 
 const RECENT_CHANGES_MAX = 10;
 
+// How long the `claude` CLI gets before we give up on it. The incremental refresh is
+// tool-free but still has to re-emit the whole document, which grows over time — 60s
+// used to be enough and silently stopped being, killing `claude` a few seconds before
+// it finished and leaving the doc stuck at its last successful refresh. Both ceilings
+// are deliberately generous: a slow refresh is recoverable, a killed one is not.
+const FULL_TIMEOUT_MS = 5 * 60_000;
+const INCREMENTAL_TIMEOUT_MS = 3 * 60_000;
+
 function realSessions(sessions: SessionFacts[]): SessionFacts[] {
   return sessions.filter((s) => s.goal !== null);
 }
@@ -53,7 +61,7 @@ export async function refreshArchitecture(
   let output: string;
   try {
     if (doFull) {
-      output = await runner(buildFullPrompt(), { cwd, tools: true, timeoutMs: 5 * 60_000 });
+      output = await runner(buildFullPrompt(), { cwd, tools: true, timeoutMs: FULL_TIMEOUT_MS });
     } else {
       const watermark = existing!.meta.coveredThroughTs;
       const newSessions = sessions.filter(
@@ -65,7 +73,7 @@ export async function refreshArchitecture(
         return { goal: p?.goal ?? s.goal!, outcome: p?.outcome ?? null };
       });
       output = await runner(buildIncrementalPrompt(existing!.markdown, changedFiles, summaries), {
-        cwd, tools: false, timeoutMs: 60_000,
+        cwd, tools: false, timeoutMs: INCREMENTAL_TIMEOUT_MS,
       });
     }
   } catch (err) {

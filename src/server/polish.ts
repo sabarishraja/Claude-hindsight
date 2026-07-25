@@ -3,9 +3,14 @@ import type { SessionFacts, PolishResult } from '../types.js';
 
 export type ClaudeRunner = (prompt: string) => Promise<string>;
 
+// Opening line of the Polish prompt, exported so the indexer can recognize and drop the
+// transcript this `claude` call leaves behind. Keep in lockstep with buildPrompt's first line.
+export const POLISH_PROMPT_SIGNATURE =
+  'You summarize coding-session transcripts. Reply with ONLY a JSON object';
+
 function buildPrompt(f: SessionFacts): string {
   return [
-    'You summarize coding-session transcripts. Reply with ONLY a JSON object',
+    POLISH_PROMPT_SIGNATURE,
     '{"goal": "...", "outcome": "..."} — one sentence each, plain language, no markdown.',
     'Session facts:',
     `- User's opening request: ${(f.goal ?? '').slice(0, 500)}`,
