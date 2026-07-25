@@ -112,10 +112,10 @@ export async function runEvalCli(
     );
     return;
   }
-  // default: run and print
+  // default: run and print. `--json` emits the raw report for CI gating / scripting.
   const names = listFixtureNames(deps.fixturesDir);
   if (names.length === 0) { console.log(`No fixtures in ${deps.fixturesDir}.`); return; }
   const report = runEval(deps.fixturesDir);
-  console.log(formatReport(report));
+  console.log(argv.includes('--json') ? JSON.stringify(report, null, 2) : formatReport(report));
   if (report.orphanedLabels.length || report.unlabeledRules.length) process.exitCode = 1;
 }

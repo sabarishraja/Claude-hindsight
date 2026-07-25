@@ -1,10 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Store } from '../src/indexer/store.js';
 import { snapshotFixture, formatReport, runEvalCli } from '../src/eval/cli.js';
 import { sha256 } from '../src/eval/fixtures.js';
+import { setLabel } from '../src/eval/run.js';
+import { parseInstructions } from '../src/analyzer/instructions.js';
 import type { ScoreReport } from '../src/eval/types.js';
 
 let dir: string;
@@ -77,6 +79,31 @@ describe('runEvalCli snapshot', () => {
 
     rmSync(noMatchCwd, { recursive: true, force: true });
     rmSync(claudeDir, { recursive: true, force: true });
+  });
+});
+
+describe('runEvalCli --json', () => {
+  it('prints a machine-readable score report instead of the human table', async () => {
+    const md = '- Always run `npx vitest run` before committing.';
+    const input = { markdown: md, source: 'CLAUDE.md', sessions: [] };
+    const inputText = JSON.stringify(input, null, 2) + '\n';
+    writeFileSync(join(dir, 'f.input.json'), inputText);
+    writeFileSync(join(dir, 'f.labels.json'),
+      JSON.stringify({ inputSha256: sha256(inputText), labels: {} }, null, 2) + '\n');
+    for (const rule of parseInstructions(md, 'CLAUDE.md')) setLabel(dir, 'f', rule.id, 'unchecked');
+
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((m?: unknown) => { logs.push(String(m)); });
+    try {
+      await runEvalCli(['--json'], { store, fixturesDir: dir, claudeDir: '', cwd: '' });
+    } finally {
+      spy.mockRestore();
+    }
+
+    const parsed = JSON.parse(logs.join('\n')) as ScoreReport;
+    expect(typeof parsed.ruleCount).toBe('number');
+    expect(parsed).toHaveProperty('confusion');
+    expect(parsed).toHaveProperty('confidentAccuracy');
   });
 });
 
