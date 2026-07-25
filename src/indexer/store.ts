@@ -3,7 +3,7 @@ import type { SessionFacts, PolishResult } from '../types.js';
 
 // Bump whenever fact extraction changes so existing databases re-index their
 // transcripts; the polish cache survives because it is paid-for LLM output.
-export const INDEX_VERSION = 3;
+export const INDEX_VERSION = 4;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS sessions (
@@ -82,6 +82,10 @@ export class Store {
       commandsRun: JSON.stringify(f.commandsRun),
       skillsInvoked: JSON.stringify(f.skillsInvoked),
     });
+  }
+
+  deleteSession(sessionId: string): void {
+    this.db.prepare('DELETE FROM sessions WHERE sessionId = ?').run(sessionId);
   }
 
   getSessions(projectDir: string): SessionFacts[] {

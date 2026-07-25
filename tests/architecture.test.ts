@@ -121,6 +121,42 @@ describe('refreshArchitecture', () => {
     expect(readArchitectureDoc(dataDir, 'proj')?.markdown).toBe(VALID_DOC);
   });
 
+  it('gives the runner enough headroom for a slow claude CLI', async () => {
+    const { dataDir, store } = setup();
+    const calls: { opts: { tools: boolean; timeoutMs: number } }[] = [];
+    const runner: ArchRunner = async (_p, opts) => { calls.push({ opts }); return VALID_DOC; };
+
+    await refreshArchitecture(store, 'proj', { dataDir, runner });
+    store.upsertSession(facts({ sessionId: 's2', lastTs: '2026-07-02T00:00:00Z' }));
+    await refreshArchitecture(store, 'proj', { dataDir, runner });
+
+    // A real incremental refresh has been observed taking >70s; 60s was killing it
+    // mid-generation, so the doc could never advance past its last fast refresh.
+    expect(calls[0].opts.timeoutMs).toBe(5 * 60_000); // full
+    expect(calls[1].opts.timeoutMs).toBe(3 * 60_000); // incremental
+  });
+
+  it('leaves both the doc and its meta untouched when the runner times out', async () => {
+    const { dataDir, store } = setup();
+    await refreshArchitecture(store, 'proj', { dataDir, runner: async () => VALID_DOC });
+    const before = readArchitectureDoc(dataDir, 'proj');
+    store.upsertSession(facts({ sessionId: 's2', lastTs: '2026-07-02T00:00:00Z' }));
+
+    // What `exec`'s timeout option surfaces once it kills the child.
+    const result = await refreshArchitecture(store, 'proj', {
+      dataDir,
+      runner: async () => { throw new Error('Command failed: claude -p --output-format text'); },
+    });
+
+    expect(result.status).toBe('error');
+    const after = readArchitectureDoc(dataDir, 'proj');
+    expect(after?.markdown).toBe(before?.markdown);
+    // The watermark must not advance — otherwise a timeout would silently mark the
+    // skipped sessions as covered and they'd never make it into the doc.
+    expect(after?.meta).toEqual(before?.meta);
+    expect(getArchitectureView(store, 'proj', dataDir).staleBy).toBe(1);
+  });
+
   it('rejects and keeps the previous doc when output is missing required sections', async () => {
     const { dataDir, store } = setup();
     await refreshArchitecture(store, 'proj', { dataDir, runner: async () => VALID_DOC });

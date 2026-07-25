@@ -59,6 +59,10 @@ it was loaded into.
 
 ## Install
 
+**New here?** [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md) is a step-by-step tour of every
+surface — what to run, what you should see, and why it matters — written for someone who has
+never used this before.
+
 ```bash
 npm install
 npm run build
@@ -149,6 +153,13 @@ The doc lives under `~/.claude-hindsight/architecture/`, not in your repo —
 `--write` is the only thing that ever touches a file in your project. The
 terminal briefing, statusline, and web dashboard all show a small nudge when
 the doc has fallen behind the sessions you've actually run.
+
+You don't have to use the CLI for this. The dashboard's **Architecture** view has a
+**⟳ Refresh** button (and **Full rebuild**, the `--full` equivalent) that runs the same
+generation in place, plus a **✨ Generate now** button when a project has no doc yet. It's
+backed by `POST /api/projects/:dir/architecture/refresh`, which — like Polish — allows only one
+run per project at a time and returns `409` if you double-click it. A failed generation comes
+back as a normal response that keeps the previous doc rather than an error page.
 
 ### MCP: query hindsight live, mid-conversation
 
@@ -251,11 +262,35 @@ matching. Concretely, per rule:
   that shells out to `claude -p` is the reusable piece a future `--deep` mode would build on,
   but v1 ships static-only by design.
 
+## Measuring the audit: the eval harness
+
+The audit above is a heuristic, so the honest question is *how good is it?* The `eval`
+subcommand answers that with numbers instead of vibes. It works against **fixtures** — frozen
+snapshots of a project's sessions plus its `CLAUDE.md` — that you hand-label with the verdict
+each rule *should* get, then scores the audit's predictions against your labels.
+
+The loop is three commands:
+
+```bash
+node dist/cli.js eval snapshot <name>   # freeze this project (sessions + CLAUDE.md) into a fixture
+node dist/cli.js eval label <name>      # walk each rule and record the expected verdict (v/f/d/u)
+node dist/cli.js eval                    # score the audit against every labelled fixture
+```
+
+`eval snapshot` writes a read-only `<name>.input.json` and an empty `<name>.labels.json` under
+`tests/eval/fixtures/train/`; `eval label` fills in the labels interactively (one keypress per
+rule: **v**iolated / **f**ollowed / **d**ead / **u**nchecked); `eval` prints confident
+accuracy, abstention rate, missed violations, and a confusion matrix. Add `--json` to emit the
+raw report for CI gating or scripting. Fixtures are committed, so the score is reproducible and
+a regression in the heuristic shows up as a measurable drop.
+
 ## Command reference
 
 | Command | What it does |
 | --- | --- |
 | `node dist/cli.js` | Terminal briefing for the current directory's project |
+| `node dist/cli.js --help` / `-h` | Print usage for every command and flag |
+| `node dist/cli.js --version` / `-v` | Print the installed version |
 | `node dist/cli.js --web` | Web dashboard (Briefing + Architecture + Instruction Audit) at `http://localhost:4756` |
 | `node dist/cli.js --plain` | No colors/box-drawing; silent if the directory has no history (for hooks/pipes) |
 | `node dist/cli.js --port <n>` | HTTP port for `--web` (default `4756`) |
@@ -267,6 +302,9 @@ matching. Concretely, per rule:
 | `node dist/cli.js architecture --full` | Force a full re-exploration of the codebase (agentic, read-only) instead of an incremental refresh |
 | `node dist/cli.js architecture --write <path>` | Also export the current doc to a file in your repo |
 | `node dist/cli.js architecture --print` | Print the cached doc only — never refreshes, never calls an LLM |
+| `node dist/cli.js eval snapshot <name>` | Freeze this project (sessions + `CLAUDE.md`) into a labellable fixture |
+| `node dist/cli.js eval label <name>` | Interactively record the expected verdict for each rule in a fixture |
+| `node dist/cli.js eval [--json]` | Score the audit against every labelled fixture (table, or raw JSON with `--json`) |
 
 ## Screenshots
 

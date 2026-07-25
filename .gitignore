@@ -6,3 +6,9 @@ ui/dist/
 docs/superpowers/
 .superpowers/
 .claude/
+.oversight/
+
+# `eval snapshot` freezes YOUR real sessions — goals, absolute paths, commands run — into
+# train fixtures. They're personal data, so they stay local. The committed baseline the
+# non-regression gate scores against lives in tests/eval/fixtures/heldout/ and is synthetic.
+tests/eval/fixtures/train/
