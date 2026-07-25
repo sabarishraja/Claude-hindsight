@@ -14,6 +14,7 @@ import { installStatusline, statuslineInstallCommand } from './statusline/instal
 import { refreshArchitecture, getArchitectureView } from './architecture/architecture.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createMcpServer } from './mcp/server.js';
+import { USAGE, topLevelIntent, readVersion } from './cliMeta.js';
 
 function arg(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`);
@@ -203,6 +204,16 @@ async function architectureCommand(store: Store, dataDir: string): Promise<void>
 }
 
 async function main(): Promise<void> {
+  const intent = topLevelIntent(process.argv.slice(2));
+  if (intent === 'help') {
+    console.log(USAGE);
+    return;
+  }
+  if (intent === 'version') {
+    const here = dirname(fileURLToPath(import.meta.url));
+    console.log(readVersion(join(here, '..', 'package.json')));
+    return;
+  }
   if (process.argv[2] === 'statusline') {
     statuslineCommand();
     return;
